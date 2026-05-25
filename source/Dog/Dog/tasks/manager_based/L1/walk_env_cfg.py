@@ -1,11 +1,8 @@
 
 import math
-from dataclasses import MISSING
 
 import isaaclab.sim as sim_utils
-from isaaclab.assets import ArticulationCfg, AssetBaseCfg
-from isaaclab.devices import DevicesCfg
-from isaaclab.devices.keyboard import Se2KeyboardCfg
+from isaaclab.assets import AssetBaseCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -20,16 +17,12 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
-from isaaclab.terrains.config.rough import ROUGH_TERRAINS_CFG  # isort: skip
 from . import mdp
 ##
 # 预定义配置导入
 ##
-from Dog.robots.rc_dog import L1_CFG
-from isaaclab_assets.robots.cartpole import CARTPOLE_CFG  # isort:skip
-from .dog_env_cfg import DogEnvCfg
+from Dog.robots.l1 import L1_CFG
 from Dog.assets.terrain.step_terrain import STEP_TERRAINS_CFG
-
 # ── 场景配置（平地步态用）──────────────────────────────────────────
 @configclass
 class SceneCfg(InteractiveSceneCfg):
@@ -70,6 +63,7 @@ class SceneCfg(InteractiveSceneCfg):
             texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
         ),
     )
+   
 
 @configclass
 class CommandsCfg: #MDP（马尔可夫决策过程）指令生成器的配置类
@@ -89,17 +83,46 @@ class CommandsCfg: #MDP（马尔可夫决策过程）指令生成器的配置类
         ),
     )
 
-
 @configclass 
 class ObservationsCfg:
     @configclass 
     class PolicyCfg(ObsGroup):
+        # base_lin_vel=ObsTerm(func=mdp.base_lin_vel,noise=Unoise(n_min=-0.1,n_max=0.1))
+        base_ang_vel=ObsTerm(func=mdp.base_ang_vel,noise=Unoise(n_min=-0.2,n_max=0.2))
+        projected_gravity=ObsTerm(
+            func=mdp.projected_gravity,
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
+        actions = ObsTerm(func=mdp.last_action)
+        # height_scan = ObsTerm(
+        #     func=mdp.height_scan,
+        #     params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+        #     noise=Unoise(n_min=-0.1, n_max=0.1),
+        #     clip=(-1.0, 1.0),
+        # )
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    # observation groups
+    policy: PolicyCfg = PolicyCfg()
+
+
+    @configclass
+    class CriticCfg(ObsGroup):
+        """Observations for critic group. (has privilege observations)"""
+
+        # observation terms (order preserved)
         base_lin_vel=ObsTerm(func=mdp.base_lin_vel,noise=Unoise(n_min=-0.1,n_max=0.1))
         base_ang_vel=ObsTerm(func=mdp.base_ang_vel,noise=Unoise(n_min=-0.2,n_max=0.2))
         projected_gravity=ObsTerm(
             func=mdp.projected_gravity,
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
+        # root_local_rot_tan_norm = ObsTerm(func=mdp.root_local_rot_tan_norm)
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
@@ -110,12 +133,14 @@ class ObservationsCfg:
             noise=Unoise(n_min=-0.1, n_max=0.1),
             clip=(-1.0, 1.0),
         )
-        def __post_init__(self):
-            self.enable_corruption = True
-            self.concatenate_terms = True
 
-    # observation groups
-    policy: PolicyCfg = PolicyCfg()
+        def __post_init__(self):
+            self.history_length = 3
+            self.enable_corruption = False
+            self.concatenate_terms = True
+    
+    critic: CriticCfg = CriticCfg()
+    
 
 @configclass
 class ActionsCfg:
@@ -137,7 +162,7 @@ class RewardsCfg:
     )
     # -- penalties
     #抑制竖直速度过大
-    lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-0.1)
+    lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-0.15)
     # #横滚和俯仰角速度
     ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.01)
     # #电机力矩
@@ -148,7 +173,7 @@ class RewardsCfg:
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
-        weight=0.125,
+        weight=0,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
             "command_name": "base_velocity",
@@ -188,9 +213,9 @@ class RewardsCfg:
 
     base_height_l2 = RewTerm(
         func=mdp.base_height_l2,
-        weight=-2.0,
+        weight=-1.0,
         params={
-            "target_height": 0.25,
+            "target_height": 0.23,
         },
     )
 
@@ -201,13 +226,35 @@ class RewardsCfg:
         "asset_cfg": SceneEntityCfg("robot"),
         "mirror_joints": [
             ["FL_ABAD_JOINT", "RR_ABAD_JOINT"],
+            ["FL_HIP_JOINT", "RR_HIP_JOINT"],
             ["FL_KNEE_JOINT", "RR_KNEE_JOINT"],
 
             ["FR_ABAD_JOINT", "RL_ABAD_JOINT"],
+            ["FR_HIP_JOINT", "RL_HIP_JOINT"],
             ["FR_KNEE_JOINT", "RL_KNEE_JOINT"],
         ],
     },
 )
+    
+    foot_slide=RewTerm(
+        func=mdp.feet_slide,
+        weight=-0.1,
+           params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*FOOT_LINK"),
+        },
+    )
+
+    sound_suppression = RewTerm(
+        func=mdp.sound_suppression_acc_per_foot,
+        weight=-0.001,
+        params={
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=".*FOOT_LINK",
+            ),
+        },
+    )
 #     feet_distance_xy = RewTerm(
 #     func=mdp.feet_distance_xy_exp,
 #     weight=0.4,
@@ -353,14 +400,11 @@ class EventCfg:#定义训练过程中的一些事件
 
 # ── 平地步态环境 ──────────────────────────────────────────────────
 @configclass
-class Dog_Walk_Flat_Env(DogEnvCfg):
-    """四足机器人平地行走环境。
-
-    继承自 DogEnvCfg 基类，配置场景、观测、动作、奖励、终止条件。
-    """
+class L1_Walk_Flat_Env(ManagerBasedRLEnvCfg):
+    """L1 四足机器人平地行走环境。"""
     # 场景设置：4096 个并行环境，每个间隔 4m
     scene: SceneCfg = SceneCfg(num_envs=4096, env_spacing=4.0)
-    # 基础模块（具体定义在 DogEnvCfg 或其混入类中）
+    # MDP 设置
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     events: EventCfg = EventCfg()
@@ -382,38 +426,23 @@ class Dog_Walk_Flat_Env(DogEnvCfg):
         self.sim.render_interval = self.decimation # 渲染间隔
 
 
-# @configclass
-# class Dog_Walk_Flat_Env_Play(Dog_Walk_Flat_Env):
-#     """四足机器人平地行走环境（手动控制模式）。
+@configclass
+class L1_Walk_Flat_Env_Play(L1_Walk_Flat_Env):
 
-#     单机器人，通过键盘控制目标速度：
-#     - 方向键 上/下     → 前进/后退 (v_x)
-#     - 方向键 左/右     → 左移/右移 (v_y)
-#     - Z / X          → 左转/右转 (omega_z)
-#     - L               → 重置所有速度指令
-#     """
-#     scene: SceneCfg = SceneCfg(num_envs=1, env_spacing=4.0)
-#     observations: ObservationsCfg = ObservationsCfg()
-#     actions: ActionsCfg = ActionsCfg()
-#     events: EventCfg = EventCfg()
-#     rewards: RewardsCfg = RewardsCfg()
-#     terminations: TerminationsCfg = TerminationsCfg()
-#     commands: CommandsCfg = CommandsCfg()
 
-#     def __post_init__(self) -> None:
-#         self.decimation = 2
-#         self.episode_length_s = 20                # Play 模式下 episode 更长
-#         self.viewer.eye = (8.0, 0.0, 5.0)
-#         self.sim.dt = 1 / 120
-#         self.sim.render_interval = self.decimation
 
-#         self.teleop_devices = DevicesCfg(
-#             devices={
-#                 "keyboard": Se2KeyboardCfg(
-#                     v_x_sensitivity=1.0,          # 前进/后退灵敏度
-#                     v_y_sensitivity=0.5,          # 左右移动灵敏度
-#                     omega_z_sensitivity=1.0,      # 旋转灵敏度
-#                     sim_device=self.sim.device,
-#                 ),
-#             },
-#         )
+    def __post_init__(self) -> None:
+
+        self.scene.num_envs=1
+        self.scene.env_spacing=2.5
+
+        self.episode_length_s = 40                # Play 模式下 episode 更长
+        self.viewer.eye = (8.0, 0.0, 5.0)
+        self.sim.dt = 1 / 120
+        self.sim.render_interval = self.decimation
+
+        self.commands.base_velocity.ranges.lin_vel_x = (1.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
+
+        self.observations.policy.enable_corruption = False 

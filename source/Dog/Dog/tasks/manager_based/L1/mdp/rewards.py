@@ -262,3 +262,68 @@ def joint_mirror(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, mirror_joint
     reward *= 1 / len(mirror_joints) if len(mirror_joints) > 0 else 0
     reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
     return reward
+
+def feet_slide(
+    env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Penalize feet sliding.
+
+    This function penalizes the agent for sliding its feet on the ground. The reward is computed as the
+    norm of the linear velocity of the feet multiplied by a binary contact sensor. This ensures that the
+    agent is penalized only when the feet are in contact with the ground.
+    """
+    # Penalize feet sliding
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    contacts = contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :].norm(dim=-1).max(dim=1)[0] > 1.0
+    asset: RigidObject = env.scene[asset_cfg.name]
+
+    cur_footvel_translated = asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :] - asset.data.root_lin_vel_w[
+        :, :
+    ].unsqueeze(1)
+    footvel_in_body_frame = torch.zeros(env.num_envs, len(asset_cfg.body_ids), 3, device=env.device)
+    for i in range(len(asset_cfg.body_ids)):
+        footvel_in_body_frame[:, i, :] = math_utils.quat_apply_inverse(
+            asset.data.root_quat_w, cur_footvel_translated[:, i, :]
+        )
+    foot_leteral_vel = torch.sqrt(torch.sum(torch.square(footvel_in_body_frame[:, :, :2]), dim=2)).view(
+        env.num_envs, -1
+    )
+    reward = torch.sum(foot_leteral_vel * contacts, dim=1)
+    return reward
+
+
+def sound_suppression_acc_per_foot(
+    env: ManagerBasedRLEnv,
+    sensor_cfg: SceneEntityCfg,
+    command_name: str = "base_velocity",
+) -> torch.Tensor:
+    """
+    Compute per-foot acceleration penalty for sound suppression.
+
+    Penalize large vertical (z) accelerations when a foot is in contact with the ground.
+    """
+
+    asset = env.scene["robot"]
+
+    # shape: (Nenv, Nbody, 6)
+    body_acc = asset.data.body_acc_w
+
+    # shape: (Nenv, Nfeet)
+    foot_acc_z = body_acc[:, sensor_cfg.body_ids, 2]
+
+    contact_sensor = env.scene.sensors[sensor_cfg.name]
+    #shape [num_envs, num_feet]
+    contact_force_z = contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids, 2]
+    in_contact = torch.abs(contact_force_z) > 1.0  # (Nenv, Nfeet)
+
+    acc_penalty = (foot_acc_z ** 2) * in_contact.float()
+    acc_penalty = torch.clamp(acc_penalty, max=50.0)
+
+    penalty = acc_penalty.sum(dim=1)
+    reward = penalty
+
+    cmd = env.command_manager.get_command(command_name)
+    cmd_speed = torch.norm(cmd[:, :2], dim=1)
+    reward = reward * (cmd_speed < 1.5).float()
+
+    return reward
