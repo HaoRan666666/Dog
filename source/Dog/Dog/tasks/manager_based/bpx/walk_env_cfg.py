@@ -71,17 +71,25 @@ class SceneCfg(InteractiveSceneCfg):
 class CommandsCfg: #MDP（马尔可夫决策过程）指令生成器的配置类
     """Command specifications for the MDP."""
 
-    base_velocity = mdp.UniformVelocityCommandCfg(
+    base_velocity = mdp.UniformLevelVelocityCommandCfg(
         asset_name="robot",#这些指令是发给场景中名为 "robot" 的资产（一般就是机器人）需要和 SceneCfg 中的 prim_path 匹配
         resampling_time_range=(5.0, 5.0),#每 10 秒重新生成一次新的目标速度命令（恒定时间）。
-        rel_standing_envs=0.02,#2% 的环境（sub-env）保持“站立不动”命令 = (0,0,0)。
+        rel_standing_envs=0.1,#2% 的环境（sub-env）保持“站立不动”命令 = (0,0,0)。
         rel_heading_envs=1.0,#100% 的环境具有 heading command（方向控制要求）。
         heading_command=True,#机器人不仅需要跟随速度，还需要跟随一个地面航向角。
         heading_control_stiffness=0.5,#用于 heading 控制的 soft-weight / gain：0：不太在意1：非常严格要求朝向
         debug_vis=True,#在 Isaac Sim 里实时可视化命令向量（箭头、指示方向）。
-        ranges=mdp.UniformVelocityCommandCfg.Ranges(
-        lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
-        #速度命令的采样范围
+        # ranges=mdp.UniformVelocityCommandCfg.Ranges(
+        # lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+        # #速度命令的采样范围
+        # ),
+
+#基于课程的速度指令
+        ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
+            lin_vel_x=(-0.1, 0.1), lin_vel_y=(-0.1, 0.1), ang_vel_z=(-1.5, 1.5) ,heading=(-math.pi, math.pi)
+        ),
+        limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
+            lin_vel_x=(-3.0, 3.0), lin_vel_y=(-2.0, 2.0), ang_vel_z=(-1.5,1.5)
         ),
     )
 
@@ -304,6 +312,17 @@ class RewardsCfg:
         },
     )
 
+
+    feet_contact_without_cmd = RewTerm(
+        func=mdp.feet_contact_without_cmd,
+        weight=0.1,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*toe_link"),
+            "command_name": "base_velocity",
+        },
+    )
+
+
 #     feet_distance_xy = RewTerm(
 
 
@@ -463,7 +482,7 @@ class BPX_Walk_Flat_Env(ManagerBasedRLEnvCfg):
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
     commands: CommandsCfg=CommandsCfg()
-    # curriculum: CurriculumCfg=CurriculumCfg()
+    curriculum: CurriculumCfg=CurriculumCfg()
 
     def __post_init__(self) -> None:
         """初始化后回调：设置仿真步长、回合长度等参数。"""
@@ -501,6 +520,9 @@ class BPX_Walk_Flat_Env_Play(BPX_Walk_Flat_Env):
                 omega_z_sensitivity=2.0,
             ),
         })
+
+        # Play 模式不需要 curriculum
+        self.curriculum = None
 
 
 MAP_USD = "/home/xhr/dog/Dog/source/Dog/Dog/assets/terrain/complete_enue_mesh.usd"
