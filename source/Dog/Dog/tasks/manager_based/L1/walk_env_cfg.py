@@ -2,7 +2,7 @@
 import math
 
 import isaaclab.sim as sim_utils
-from isaaclab.assets import AssetBaseCfg
+from isaaclab.assets import AssetBaseCfg, RigidObjectCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -171,15 +171,15 @@ class RewardsCfg:
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
     # #动作变化
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
-    feet_air_time = RewTerm(
-        func=mdp.feet_air_time,
-        weight=0,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-            "command_name": "base_velocity",
-            "threshold": 0.5,
-        },
-    )
+    # feet_air_time = RewTerm(
+    #     func=mdp.feet_air_time,
+    #     weight=0,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+    #         "command_name": "base_velocity",
+    #         "threshold": 0.5,
+    #     },
+    # )
     undesired_contacts = RewTerm(  #大腿接触力大于阈值则受到惩罚
         func=mdp.undesired_contacts,
         weight=-10.0,
@@ -187,7 +187,7 @@ class RewardsCfg:
     )
     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-0.5)
-    dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)
+    # dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)
     trotting_rew= RewTerm(
         func= mdp.GaitReward,
         weight= 0.2,
@@ -226,11 +226,9 @@ class RewardsCfg:
         "asset_cfg": SceneEntityCfg("robot"),
         "mirror_joints": [
             ["FL_ABAD_JOINT", "RR_ABAD_JOINT"],
-            ["FL_HIP_JOINT", "RR_HIP_JOINT"],
             ["FL_KNEE_JOINT", "RR_KNEE_JOINT"],
 
             ["FR_ABAD_JOINT", "RL_ABAD_JOINT"],
-            ["FR_HIP_JOINT", "RL_HIP_JOINT"],
             ["FR_KNEE_JOINT", "RL_KNEE_JOINT"],
         ],
     },
@@ -404,7 +402,7 @@ class L1_Walk_Flat_Env(ManagerBasedRLEnvCfg):
     """L1 四足机器人平地行走环境。"""
     # 场景设置：4096 个并行环境，每个间隔 4m
     scene: SceneCfg = SceneCfg(num_envs=4096, env_spacing=4.0)
-    # MDP 设置
+    # 基础模块（具体定义在 DogEnvCfg 或其混入类中）
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     events: EventCfg = EventCfg()
@@ -429,14 +427,13 @@ class L1_Walk_Flat_Env(ManagerBasedRLEnvCfg):
 @configclass
 class L1_Walk_Flat_Env_Play(L1_Walk_Flat_Env):
 
-
-
     def __post_init__(self) -> None:
 
         self.scene.num_envs=1
         self.scene.env_spacing=2.5
 
-        self.episode_length_s = 40                # Play 模式下 episode 更长
+        self.decimation = 2
+        self.episode_length_s = 40
         self.viewer.eye = (8.0, 0.0, 5.0)
         self.sim.dt = 1 / 120
         self.sim.render_interval = self.decimation
@@ -445,4 +442,51 @@ class L1_Walk_Flat_Env_Play(L1_Walk_Flat_Env):
         self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
         self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
 
-        self.observations.policy.enable_corruption = False 
+        self.observations.policy.enable_corruption = False
+
+
+MAP_USD = "/home/xhr/dog/Dog/source/Dog/Dog/assets/terrain/complete_enue_mesh.usd"
+
+
+@configclass
+class MapSceneCfg(SceneCfg):
+    """带自定义场地地图的场景（地图作为静态碰撞体加载）。"""
+    terrain_map = AssetBaseCfg(
+        prim_path="/World/terrain_map",
+        spawn=sim_utils.UsdFileCfg(
+            usd_path=MAP_USD,
+            scale=(0.1, 0.1, 0.1),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                rigid_body_enabled=True,
+                kinematic_enabled=True,
+            ),
+        ),
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(0.0, 0.0, 0.0),
+        ),
+        collision_group=-1,
+    )
+
+
+@configclass
+class L1_Terrain_Play_Env(L1_Walk_Flat_Env):
+    scene: MapSceneCfg = MapSceneCfg(num_envs=1, env_spacing=2.5)
+
+    def __post_init__(self) -> None:
+        self.scene.terrain.visual_material = None
+        self.scene.terrain.physics_material = None  # 地面平面碰撞关闭，地图自带碰撞
+
+        self.decimation = 2
+        self.episode_length_s = 40
+        self.viewer.eye = (20.0, 20.0, 15.0)
+        self.sim.dt = 1 / 120
+        self.sim.render_interval = self.decimation
+
+        self.commands.base_velocity.ranges.lin_vel_x = (1.0, 1.0)
+        self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
+        self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
+
+        self.observations.policy.enable_corruption = False
+
+        self.scene.robot.init_state.pos = (2.0, -2.0, 0.2)
+        self.events.reset_base = None

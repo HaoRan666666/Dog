@@ -327,3 +327,82 @@ def sound_suppression_acc_per_foot(
     reward = reward * (cmd_speed < 1.5).float()
 
     return reward
+
+
+def action_mirror(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, mirror_joints: list[list[str]]) -> torch.Tensor:
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    if not hasattr(env, "action_mirror_joints_cache") or env.action_mirror_joints_cache is None:
+        # Cache joint positions for all pairs
+        env.action_mirror_joints_cache = [
+            [asset.find_joints(joint_name) for joint_name in joint_pair] for joint_pair in mirror_joints
+        ]
+    reward = torch.zeros(env.num_envs, device=env.device)
+    # Iterate over all joint pairs
+    for joint_pair in env.action_mirror_joints_cache:
+        # Calculate the difference for each pair and add to the total reward
+        diff = torch.sum(
+            torch.square(
+                torch.abs(env.action_manager.action[:, joint_pair[0][0]])
+                - torch.abs(env.action_manager.action[:, joint_pair[1][0]])
+            ),
+            dim=-1,
+        )
+        reward += diff
+    reward *= 1 / len(mirror_joints) if len(mirror_joints) > 0 else 0
+    reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
+    return reward
+
+def stand_still_joint_deviation_l1(
+    env, command_name: str, command_threshold: float = 0.06, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Penalize offsets from the default joint positions when the command is very small."""
+    command = env.command_manager.get_command(command_name)
+    # Penalize motion when command is nearly zero.
+    return joint_deviation_l1(env, asset_cfg) * (torch.norm(command[:, :], dim=1) < command_threshold)
+
+def joint_deviation_l1(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Penalize joint positions that deviate from the default one."""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    # compute out of limits constraints
+    angle = asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.default_joint_pos[:, asset_cfg.joint_ids]
+    return torch.sum(torch.abs(angle), dim=1)
+
+def joint_pos_penalty(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    asset_cfg: SceneEntityCfg,
+    stand_still_scale: float,
+    velocity_threshold: float,
+    command_threshold: float,
+) -> torch.Tensor:
+    """Penalize joint position error from default on the articulation."""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    cmd = torch.linalg.norm(env.command_manager.get_command(command_name), dim=1)
+    body_vel = torch.linalg.norm(asset.data.root_lin_vel_b[:, :2], dim=1)
+    running_reward = torch.linalg.norm(
+        (asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.default_joint_pos[:, asset_cfg.joint_ids]), dim=1
+    )
+    reward = torch.where(
+        torch.logical_or(cmd > command_threshold, body_vel > velocity_threshold),
+        running_reward,
+        stand_still_scale * running_reward,
+    )
+    # reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
+    return reward
+
+def feet_contact_without_cmd(
+    env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, command_name: str = "base_velocity"
+) -> torch.Tensor:
+    """
+    Reward for feet contact when the command is zero.
+    """
+    # asset: Articulation = env.scene[asset_cfg.name]
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    is_contact = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids] > 0
+
+    command_norm = torch.norm(env.command_manager.get_command(command_name), dim=1)
+    reward = torch.sum(is_contact, dim=-1).float()
+    return reward * (command_norm < 0.1)

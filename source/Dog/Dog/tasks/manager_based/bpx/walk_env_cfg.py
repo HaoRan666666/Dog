@@ -3,6 +3,8 @@ import math
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import AssetBaseCfg
+from isaaclab.devices import DevicesCfg
+from isaaclab.devices.keyboard import Se2KeyboardCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -71,7 +73,7 @@ class CommandsCfg: #MDP（马尔可夫决策过程）指令生成器的配置类
 
     base_velocity = mdp.UniformVelocityCommandCfg(
         asset_name="robot",#这些指令是发给场景中名为 "robot" 的资产（一般就是机器人）需要和 SceneCfg 中的 prim_path 匹配
-        resampling_time_range=(10.0, 10.0),#每 10 秒重新生成一次新的目标速度命令（恒定时间）。
+        resampling_time_range=(5.0, 5.0),#每 10 秒重新生成一次新的目标速度命令（恒定时间）。
         rel_standing_envs=0.02,#2% 的环境（sub-env）保持“站立不动”命令 = (0,0,0)。
         rel_heading_envs=1.0,#100% 的环境具有 heading command（方向控制要求）。
         heading_command=True,#机器人不仅需要跟随速度，还需要跟随一个地面航向角。
@@ -187,7 +189,9 @@ class RewardsCfg:
     )
     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-0.5)
-    dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)
+    joint_pos_limits = RewTerm(
+        func=mdp.joint_pos_limits, weight=-20.0, params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*")}
+    )
     trotting_rew= RewTerm(
         func= mdp.GaitReward,
         weight= 0.2,
@@ -211,13 +215,13 @@ class RewardsCfg:
     params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*toe_link")},
     )
 
-    base_height_l2 = RewTerm(
-        func=mdp.base_height_l2,
-        weight=-1.0,
-        params={
-            "target_height": 0.23,
-        },
-    )
+    # base_height_l2 = RewTerm(
+    #     func=mdp.base_height_l2,
+    #     weight=-1.0,
+    #     params={
+    #         "target_height": 0.23,
+    #     },
+    # )
 
     diagonal_joint_mirror = RewTerm(
     func=mdp.joint_mirror,
@@ -225,11 +229,9 @@ class RewardsCfg:
     params={
         "asset_cfg": SceneEntityCfg("robot"),
         "mirror_joints": [
-            ["fl_hip_roll_joint", "hr_hip_roll_joint"],
             ["fl_hip_pitch_joint", "hr_hip_pitch_joint"],
             ["fl_knee_joint", "hr_knee_joint"],
 
-            ["fr_hip_roll_joint", "hl_hip_roll_joint"],
             ["fr_hip_pitch_joint", "hl_hip_pitch_joint"],
             ["fr_knee_joint", "hl_knee_joint"],
         ],
@@ -247,7 +249,7 @@ class RewardsCfg:
 
     sound_suppression = RewTerm(
         func=mdp.sound_suppression_acc_per_foot,
-        weight=-0.001,
+        weight=-0.002,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
@@ -255,7 +257,56 @@ class RewardsCfg:
             ),
         },
     )
+
+    # stand_still = RewTerm(
+    #     func=mdp.stand_still_joint_deviation_l1,
+    #     weight=-0.5,
+    #     params={
+    #             "command_name": "base_velocity",
+    #             "command_threshold": 0.1,
+    #             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+    #           },
+    # ) 
+
+    hipx_joint_pos_penalty = RewTerm(
+        func=mdp.joint_pos_penalty,
+        weight=-0.4,
+        params={
+            "command_name": "base_velocity",
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*_hip_roll_joint"),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.5,
+            "command_threshold": 0.1,
+        },
+    )
+
+    hipy_joint_pos_penalty = RewTerm(
+        func=mdp.joint_pos_penalty,
+        weight=-0.2,
+        params={
+            "command_name": "base_velocity",
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*_hip_pitch_joint"),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.5,
+            "command_threshold": 0.1,
+        },
+    )
+
+    knee_joint_pos_penalty = RewTerm(
+        func=mdp.joint_pos_penalty,
+        weight=-2,
+        params={
+            "command_name": "base_velocity",
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*_knee_joint"),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.5,
+            "command_threshold": 0.1,
+        },
+    )
+
 #     feet_distance_xy = RewTerm(
+
+
 #     func=mdp.feet_distance_xy_exp,
 #     weight=0.4,
 #     params={
@@ -307,8 +358,8 @@ class TerminationsCfg:
 class CurriculumCfg:
     """Curriculum terms for the MDP."""
 
-    terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
-
+    # terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
+    lin_vel_cmd_levels = CurrTerm(mdp.lin_vel_cmd_levels)
 
 
 @configclass
@@ -335,7 +386,7 @@ class EventCfg:#定义训练过程中的一些事件
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="torso"),
-            "mass_distribution_params": (-5.0, 5.0),
+            "mass_distribution_params": (-2.0, 2.0),
             "operation": "add",
         },
     )
@@ -418,7 +469,7 @@ class BPX_Walk_Flat_Env(ManagerBasedRLEnvCfg):
         """初始化后回调：设置仿真步长、回合长度等参数。"""
         # 通用设置
         self.decimation = 2                       # 每 2 步物理仿真执行一次控制
-        self.episode_length_s = 5                 # 每个 episode 最大时长 (s)
+        self.episode_length_s = 8                 # 每个 episode 最大时长 (s)
         # 视角设置
         self.viewer.eye = (8.0, 0.0, 5.0)        # 相机默认位置 (x, y, z)
         # 仿真设置
@@ -434,13 +485,62 @@ class BPX_Walk_Flat_Env_Play(BPX_Walk_Flat_Env):
         self.scene.num_envs=1
         self.scene.env_spacing=2.5
 
-        self.episode_length_s = 40                # Play 模式下 episode 更长
+        self.decimation = 2
+        self.episode_length_s = 40
         self.viewer.eye = (8.0, 0.0, 5.0)
         self.sim.dt = 1 / 120
         self.sim.render_interval = self.decimation
 
-        self.commands.base_velocity.ranges.lin_vel_x = (1.0, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (0.0, 0.0)
+        self.observations.policy.enable_corruption = False
 
-        self.observations.policy.enable_corruption = False 
+        # 键盘控制: WASD 控制线速度, Q/E 控制转向
+        self.teleop_devices = DevicesCfg({
+            "keyboard": Se2KeyboardCfg(
+                v_x_sensitivity=1.0,
+                v_y_sensitivity=1.0,
+                omega_z_sensitivity=2.0,
+            ),
+        })
+
+
+MAP_USD = "/home/xhr/dog/Dog/source/Dog/Dog/assets/terrain/complete_enue_mesh.usd"
+
+
+@configclass
+class BpxMapSceneCfg(SceneCfg):
+    terrain_map = AssetBaseCfg(
+        prim_path="/World/terrain_map",
+        spawn=sim_utils.UsdFileCfg(
+            usd_path=MAP_USD,
+            scale=(0.1, 0.1, 0.1),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                rigid_body_enabled=True,
+                kinematic_enabled=True,
+            ),
+        ),
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(0.0, 0.0, 0.0),
+        ),
+        collision_group=-1,
+    )
+
+
+@configclass
+class BPX_Terrain_Play_Env(BPX_Walk_Flat_Env):
+    scene: BpxMapSceneCfg = BpxMapSceneCfg(num_envs=1, env_spacing=2.5)
+
+    def __post_init__(self) -> None:
+        self.scene.terrain.visual_material = None
+
+        self.decimation = 2
+        self.episode_length_s = 40
+        self.viewer.eye = (20.0, 20.0, 15.0)
+        self.sim.dt = 1 / 120
+        self.sim.render_interval = self.decimation
+
+        self.observations.policy.enable_corruption = False
+
+        self.scene.robot.init_state.pos = (0.0, 0.0, 2.0)
+        self.events.reset_base = None
+
+

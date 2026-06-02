@@ -7,7 +7,7 @@ USD_PATH = os.path.dirname(__file__)
 
 BPX_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{USD_PATH}/../assets/bpx/urdf/bpx.usd",
+        usd_path=f"{USD_PATH}/../assets/BPX/usd/bpx.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -26,7 +26,7 @@ BPX_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.3),
+        pos=(0.0, 0.0, 0.35),
         joint_pos={
             ".*_hip_roll_joint": 0.0,
             "f[l,r]_hip_pitch_joint": 0.8,

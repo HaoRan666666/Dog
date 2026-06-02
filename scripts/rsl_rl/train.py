@@ -3,62 +3,66 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to train RL agent with RSL-RL."""
+"""RSL-RL 强化学习训练脚本。
 
-"""Launch Isaac Sim Simulator first."""
+用法:
+    python scripts/rsl_rl/train.py --task BPX_Walk_Flat-v0 --num 1024 --max_iterations 10000
+"""
 
 import argparse
 import sys
 
 from isaaclab.app import AppLauncher
 
-# local imports
+# 本地工具导入
 import cli_args  # isort: skip
 
-# add argparse arguments
+# ── 命令行参数 ────────────────────────────────────────────────────
 parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
-parser.add_argument("--video", action="store_true", default=False, help="Record videos during training.")
-parser.add_argument("--video_length", type=int, default=200, help="Length of the recorded video (in steps).")
-parser.add_argument("--video_interval", type=int, default=2000, help="Interval between video recordings (in steps).")
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument(
-    "--agent", type=str, default="rsl_rl_cfg_entry_point", help="Name of the RL agent configuration entry point."
-)
-parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
-parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
-parser.add_argument(
-    "--distributed", action="store_true", default=False, help="Run training with multiple GPUs or nodes."
-)
-parser.add_argument("--export_io_descriptors", action="store_true", default=False, help="Export IO descriptors.")
-parser.add_argument(
-    "--ray-proc-id", "-rid", type=int, default=None, help="Automatically configured by Ray integration, otherwise None."
-)
-# append RSL-RL cli arguments
+parser.add_argument("--video", action="store_true", default=False,
+                    help="训练时录制视频")
+parser.add_argument("--video_length", type=int, default=200,
+                    help="视频长度（步数）")
+parser.add_argument("--video_interval", type=int, default=2000,
+                    help="视频录制间隔（步数）")
+parser.add_argument("--num_envs", type=int, default=None,
+                    help="并行环境数量")
+parser.add_argument("--task", type=str, default=None,
+                    help="训练任务名称，如 BPX_Walk_Flat-v0")
+parser.add_argument("--agent", type=str, default="rsl_rl_cfg_entry_point",
+                    help="RL 智能体配置入口点")
+parser.add_argument("--seed", type=int, default=None,
+                    help="随机种子")
+parser.add_argument("--max_iterations", type=int, default=None,
+                    help="最大训练迭代次数")
+parser.add_argument("--distributed", action="store_true", default=False,
+                    help="多 GPU / 多节点分布式训练")
+parser.add_argument("--export_io_descriptors", action="store_true", default=False,
+                    help="导出 IO 描述符")
+parser.add_argument("--ray-proc-id", "-rid", type=int, default=None,
+                    help="Ray 集成自动配置，通常不需要手动设置")
+
+# 附加 RSL-RL 和 AppLauncher 的命令行参数
 cli_args.add_rsl_rl_args(parser)
-# append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 args_cli, hydra_args = parser.parse_known_args()
 
-# always enable cameras to record video
+# 录制视频需要启用相机
 if args_cli.video:
     args_cli.enable_cameras = True
 
-# clear out sys.argv for Hydra
+# 清除 sys.argv 中的 hydra 参数，避免影响后续解析
 sys.argv = [sys.argv[0]] + hydra_args
 
-# launch omniverse app
+# ── 启动 Isaac Sim ─────────────────────────────────────────────────
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-"""Check for minimum supported RSL-RL version."""
-
+# ── 检查 RSL-RL 版本 ──────────────────────────────────────────────
 import importlib.metadata as metadata
 import platform
-
 from packaging import version
 
-# check minimum supported rsl-rl version
 RSL_RL_VERSION = "3.0.1"
 installed_version = metadata.version("rsl-rl-lib")
 if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
@@ -73,7 +77,9 @@ if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
     )
     exit(1)
 
-"""Rest everything follows."""
+# ═══════════════════════════════════════════════════════════════════
+# 以下代码在 Isaac Sim 进程内执行
+# ═══════════════════════════════════════════════════════════════════
 
 import gymnasium as gym
 import logging
@@ -95,88 +101,89 @@ from isaaclab.utils.io import dump_yaml
 
 from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg, RslRlVecEnvWrapper
 
-import isaaclab_tasks  # noqa: F401
+import isaaclab_tasks  # noqa: F401  注册官方任务
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
-# import logger
 logger = logging.getLogger(__name__)
 
-import Dog.tasks  # noqa: F401
+import Dog.tasks  # noqa: F401  注册自定义任务
 
-torch.backends.cuda.matmul.allow_tf32 = True
-torch.backends.cudnn.allow_tf32 = True
-torch.backends.cudnn.deterministic = False
-torch.backends.cudnn.benchmark = False
+# ── CUDA 性能优化 ─────────────────────────────────────────────────
+torch.backends.cuda.matmul.allow_tf32 = True   # 允许 TF32 加速矩阵乘法
+torch.backends.cudnn.allow_tf32 = True         # 允许 cuDNN 使用 TF32
+torch.backends.cudnn.deterministic = False     # 关闭确定性模式（更快）
+torch.backends.cudnn.benchmark = False         # 不自动搜索最优算法（稳定）
 
 
 @hydra_task_config(args_cli.task, args_cli.agent)
-def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlBaseRunnerCfg):
-    """Train with RSL-RL agent."""
-    # override configurations with non-hydra CLI arguments
+def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
+         agent_cfg: RslRlBaseRunnerCfg):
+    """训练主函数：创建环境、加载策略、运行 PPO 训练循环。"""
+
+    # ── 用命令行参数覆盖默认配置 ───────────────────────────────────
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     agent_cfg.max_iterations = (
         args_cli.max_iterations if args_cli.max_iterations is not None else agent_cfg.max_iterations
     )
 
-    # set the environment seed
-    # note: certain randomizations occur in the environment initialization so we set the seed here
+    # ── 设置随机种子 ───────────────────────────────────────��───────
     env_cfg.seed = agent_cfg.seed
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
-    # check for invalid combination of CPU device with distributed training
+
+    # CPU 不能做分布式训练
     if args_cli.distributed and args_cli.device is not None and "cpu" in args_cli.device:
         raise ValueError(
             "Distributed training is not supported when using CPU device. "
             "Please use GPU device (e.g., --device cuda) for distributed training."
         )
 
-    # multi-gpu training configuration
+    # ── 多 GPU 分布式训练配置 ──────────────────────────────────────
     if args_cli.distributed:
         env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
         agent_cfg.device = f"cuda:{app_launcher.local_rank}"
-
-        # set seed to have diversity in different threads
+        # 不同 GPU 用不同种子保证探索多样性
         seed = agent_cfg.seed + app_launcher.local_rank
         env_cfg.seed = seed
         agent_cfg.seed = seed
 
-    # specify directory for logging experiments
+    # ── 日志目录 ──────────────────────────────────────────────────
+    # 根目录: logs/rsl_rl/{experiment_name}/
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
-    # specify directory for logging runs: {time-stamp}_{run_name}
+
+    # 子目录: {时间戳}_{run_name}
     log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # The Ray Tune workflow extracts experiment name using the logging line below, hence, do not change it (see PR #2346, comment-2819298849)
     print(f"Exact experiment name requested from command line: {log_dir}")
     if agent_cfg.run_name:
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
-    # set the IO descriptors export flag if requested
+    # ── IO 描述符导出 ─────────────────────────────────────────────
     if isinstance(env_cfg, ManagerBasedRLEnvCfg):
         env_cfg.export_io_descriptors = args_cli.export_io_descriptors
     else:
         logger.warning(
-            "IO descriptors are only supported for manager based RL environments. No IO descriptors will be exported."
+            "IO descriptors are only supported for manager based RL environments."
         )
 
-    # set the log directory for the environment (works for all environment types)
     env_cfg.log_dir = log_dir
 
-    # create isaac environment
-    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+    # ── 创建 Isaac Sim 环境 ────────────────────────────────────────
+    env = gym.make(args_cli.task, cfg=env_cfg,
+                   render_mode="rgb_array" if args_cli.video else None)
 
-
-    # convert to single-agent instance if required by the RL algorithm
+    # 多智能体环境转单智能体
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
 
-    # save resume path before creating a new log_dir
+    # 如果是恢复训练，找到之前的 checkpoint 路径
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
 
-    # wrap for video recording
+    # ── 视频录制包装 ──────────────────────────────────────────────
     if args_cli.video:
         video_kwargs = {
             "video_folder": os.path.join(log_dir, "videos", "train"),
@@ -188,37 +195,37 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print_dict(video_kwargs, nesting=4)
         env = gym.wrappers.RecordVideo(env, **video_kwargs)
 
-    # wrap around environment for rsl-rl
+    # ── RSL-RL 向量化环境包装 ─────────────────────────────────────
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 
-    # create runner from rsl-rl
+    # ── 创建 PPO Runner ───────────────────────────────────────────
     if agent_cfg.class_name == "OnPolicyRunner":
         runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     elif agent_cfg.class_name == "DistillationRunner":
         runner = DistillationRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     else:
         raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
-    # write git state to logs
+
+    # 记录 git 状态到日志（方便复现）
     runner.add_git_repo_to_log(__file__)
-    # load the checkpoint
+
+    # 恢复训练时加载之前的模型
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
-        # load previously trained model
         runner.load(resume_path)
 
-    # dump the configuration into log-directory
+    # ── 保存当前配置到日志 ─────────────────────────────────────────
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
 
-    # run training
+    # ── 开始训练 ──────────────────────────────────────────────────
+    # init_at_random_ep_len=True: 初始 episode 长度随机化，防止过拟合
     runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
 
-    # close the simulator
+    # 训练结束，关闭仿真
     env.close()
 
 
 if __name__ == "__main__":
-    # run the main function
     main()
-    # close sim app
     simulation_app.close()
