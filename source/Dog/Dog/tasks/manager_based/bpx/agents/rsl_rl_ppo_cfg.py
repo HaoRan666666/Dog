@@ -16,7 +16,7 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 class PPORunnerCfg(RslRlOnPolicyRunnerCfg):  # 继承 On-Policy Runner 基类，定义一个完整的 PPO 训练配置
     num_steps_per_env = 16  # 每个环境每轮采集的步数，总样本数 = num_envs × num_steps_per_env（如 4096×16=65536）
     max_iterations = 150  # 最大训练迭代次数（每轮用一批新样本做一次 PPO 更新），也是 PPO 总轮数
-    save_interval = 50  # 模型保存间隔（每 50 轮保存一次 checkpoint），用于断点续训和后续评估
+    save_interval = 500  # 模型保存间隔（每 50 轮保存一次 checkpoint），用于断点续训和后续评估
     experiment_name = "bpx_walk_flat"  # 实验名称，日志根目录为 logs/rsl_rl/bpx_walk_flat/
     policy = RslRlPpoActorCriticCfg(  # Actor-Critic 策略网络配置
         init_noise_std=1.0,  # 初始动作噪声标准差（PPO 探索用），训练初期大噪声鼓励探索，后期逐渐衰减

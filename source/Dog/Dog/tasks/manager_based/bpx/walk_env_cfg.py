@@ -89,7 +89,7 @@ class CommandsCfg: #MDP（马尔可夫决策过程）指令生成器的配置类
             lin_vel_x=(-0.1, 0.1), lin_vel_y=(-0.1, 0.1), ang_vel_z=(-1.5, 1.5) ,heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-3.0, 3.0), lin_vel_y=(-2.0, 2.0), ang_vel_z=(-1.5,1.5)
+            lin_vel_x=(-2.5, 2,5), lin_vel_y=(-2.0, 2.0), ang_vel_z=(-1.5,1.5)
         ),
     )
 
@@ -183,7 +183,7 @@ class RewardsCfg:
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
-        weight=0,
+        weight=0.1,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*toe_link"),
             "command_name": "base_velocity",

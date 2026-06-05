@@ -130,18 +130,18 @@
     </body>
   </worldbody>
   <actuator>
-    <motor name="fl_hip_roll_joint_motor" joint="fl_hip_roll_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="fl_hip_pitch_joint_motor" joint="fl_hip_pitch_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="fl_knee_joint_motor" joint="fl_knee_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="fr_hip_roll_joint_motor" joint="fr_hip_roll_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="fr_hip_pitch_joint_motor" joint="fr_hip_pitch_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="fr_knee_joint_motor" joint="fr_knee_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="hl_hip_roll_joint_motor" joint="hl_hip_roll_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="hl_hip_pitch_joint_motor" joint="hl_hip_pitch_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="hl_knee_joint_motor" joint="hl_knee_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="hr_hip_roll_joint_motor" joint="hr_hip_roll_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="hr_hip_pitch_joint_motor" joint="hr_hip_pitch_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
-    <motor name="hr_knee_joint_motor" joint="hr_knee_joint" gear="1" ctrllimited="true" ctrlrange="-30 30" />
+    <position name="fl_hip_roll_joint_motor" joint="fl_hip_roll_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="fl_hip_pitch_joint_motor" joint="fl_hip_pitch_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="fl_knee_joint_motor" joint="fl_knee_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="fr_hip_roll_joint_motor" joint="fr_hip_roll_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="fr_hip_pitch_joint_motor" joint="fr_hip_pitch_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="fr_knee_joint_motor" joint="fr_knee_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="hl_hip_roll_joint_motor" joint="hl_hip_roll_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="hl_hip_pitch_joint_motor" joint="hl_hip_pitch_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="hl_knee_joint_motor" joint="hl_knee_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="hr_hip_roll_joint_motor" joint="hr_hip_roll_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="hr_hip_pitch_joint_motor" joint="hr_hip_pitch_joint" kp="20" kv="1" forcerange="-30 30" />
+    <position name="hr_knee_joint_motor" joint="hr_knee_joint" kp="20" kv="1" forcerange="-30 30" />
   </actuator>
   <sensor>
     <jointpos name="fl_hip_roll_joint_pos" joint="fl_hip_roll_joint" />

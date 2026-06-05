@@ -2,6 +2,7 @@ import argparse
 import torch
 import mujoco
 import mujoco.viewer
+import numpy as np
 import time
 import os
 
@@ -57,7 +58,7 @@ def world2self(quat, v):
 # ── 构建观测 ────────────────────────────────────────────────────────
 def get_obs(actions, default_dof_pos, commands=None):
     if commands is None:
-        commands = [1.0, 0.0, 0.0]
+        commands = [0.0, 0.0, 0.0]
     commands_scale = torch.tensor([1.0, 1.0, 1.0], device=device, dtype=torch.float32)
 
     # imu 角速度（机体角速度）
@@ -90,15 +91,16 @@ def get_obs(actions, default_dof_pos, commands=None):
 
 # ── 主循环 ──────────────────────────────────────────────────────────
 def main():
-    parser = argparse.ArgumentParser(description="BPX 机器人 sim2sim 迁移")
-    parser.add_argument("--policy", type=str, required=True,
-                        help="策略文件路径 (.pt)")
-    args = parser.parse_args()
-
-    loaded_policy = torch.jit.load(args.policy)
-    loaded_policy.eval()
-    loaded_policy.to(device)
-    print(f"策略加载成功: {args.policy}")
+#加载策略并设置为评估模式
+    try:
+        policy_path = "/home/xhr/dog/Dog/logs/rsl_rl/bpx_walk_flat/2026-06-02_22-49-37/exported/policy.pt"
+        loaded_policy = torch.jit.load(policy_path)
+        loaded_policy.eval()
+        loaded_policy.to(device)
+        print(f"策略加载成功: {policy_path}")
+    except Exception as e:
+            print(f"模型加载失败: {e}")
+            exit()
 
     # articulation 的 default_joint_pos = init_state.joint_pos（站立姿态）
     # joint_pos_rel = joint_pos - standing_pose（相对于站立）
@@ -117,48 +119,73 @@ def main():
 
     # 对齐 Isaac Lab 控制频率: dt=1/120, decimation=2 → 控制周期=1/60≈0.01667s
     # MuJoCo timestep=0.002, 0.01667/0.002≈8 步/控制周期
-    decimation = 8
-
-    # ── 初始化机器人到站立姿态 ─────────────────────────────────────
-    # 设置基座高度 → Isaac Lab init_state pos z=0.42 (匹配 XML)
-    base_freejoint_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, "base_freejoint")
-    base_qpos_adr = m.jnt_qposadr[base_freejoint_id]
-    d.qpos[base_qpos_adr:base_qpos_adr + 7] = [0.0, 0.0, 0.42, 1.0, 0.0, 0.0, 0.0]
-    # 设置关节到站立角度 + 施加 PD 控制保持姿态
-    standing_ctrl = default_dof_pos.cpu().numpy()
-    for i, name in enumerate(joint_names):
-        joint_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, name)
-        d.qpos[m.jnt_qposadr[joint_id]] = standing_ctrl[i]
-        d.ctrl[i] = standing_ctrl[i]
-    # 稳定物理（PD 控制保持站立）
-    for _ in range(500):
-        mujoco.mj_step(m, d)
 
     with mujoco.viewer.launch_passive(m, d) as viewer:
         while viewer.is_running():
-            # 构建观测（关节顺序与 MuJoCo actuator 一致）
-            obs = get_obs(actions=actions, default_dof_pos=default_dof_pos)
+            obs = get_obs(actions=actions,
+                          default_dof_pos=default_dof_pos)
             obs = torch.clip(obs, -100, 100)
 
-            # 策略推理
             actions = loaded_policy(obs)
 
-            # 计算关节目标位置: raw_action * scale + default_joint_pos
             act = actions * actions_scale + default_dof_pos
             act = torch.clip(act, -100, 100)
+            # print("actions:", act)
             act = act.detach().cpu().numpy()
             for i in range(12):
                 d.ctrl[i] = act[i]
 
+            # 执行一步模拟
             step_start = time.time()
-            for _ in range(decimation):
+            for i in range(8):
                 mujoco.mj_step(m, d)
-
+            # 更新渲染
             viewer.sync()
-
-            time_until_next_step = m.opt.timestep * decimation - (time.time() - step_start)
+            # 同步时间
+            time_until_next_step = m.opt.timestep*8 - (time.time() - step_start)
             if time_until_next_step > 0:
                 time.sleep(time_until_next_step)
+
+    # ── 初始化机器人到站立姿态 ─────────────────────────────────────
+    # # 设置基座高度 → Isaac Lab init_state pos z=0.42 (匹配 XML)
+    # base_freejoint_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, "base_freejoint")
+    # base_qpos_adr = m.jnt_qposadr[base_freejoint_id]
+    # d.qpos[base_qpos_adr:base_qpos_adr + 7] = [0.0, 0.0, 0.42, 1.0, 0.0, 0.0, 0.0]
+    # # 设置关节到站立角度 + 施加 PD 控制保持姿态
+    # standing_ctrl = default_dof_pos.cpu().numpy()
+    # for i, name in enumerate(joint_names):
+    #     joint_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, name)
+    #     d.qpos[m.jnt_qposadr[joint_id]] = standing_ctrl[i]
+    #     d.ctrl[i] = standing_ctrl[i]
+    # # 稳定物理（PD 控制保持站立）
+    # for _ in range(500):
+    #     mujoco.mj_step(m, d)
+
+    # with mujoco.viewer.launch_passive(m, d) as viewer:
+    #     while viewer.is_running():
+    #         # 构建观测（关节顺序与 MuJoCo actuator 一致）
+    #         obs = get_obs(actions=actions, default_dof_pos=default_dof_pos)
+    #         obs = torch.clip(obs, -100, 100)
+
+    #         # 策略推理
+    #         actions = loaded_policy(obs)
+
+    #         # 计算关节目标位置: raw_action * scale + default_joint_pos
+    #         act = actions * actions_scale + default_dof_pos
+    #         act = torch.clip(act, -100, 100)
+    #         act = act.detach().cpu().numpy()
+    #         for i in range(12):
+    #             d.ctrl[i] = act[i]
+
+    #         step_start = time.time()
+    #         for _ in range(decimation):
+    #             mujoco.mj_step(m, d)
+
+    #         viewer.sync()
+
+    #         time_until_next_step = m.opt.timestep * decimation - (time.time() - step_start)
+    #         if time_until_next_step > 0:
+    #             time.sleep(time_until_next_step)
 
 
 if __name__ == "__main__":

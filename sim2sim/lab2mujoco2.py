@@ -111,6 +111,7 @@ def main():
         ],
         device=device,
         dtype=torch.float32)
+    
     act_default_dof_pos = torch.tensor([
         0.00, 0.80, -1.50,
         0.00, 0.80, -1.50,
@@ -120,12 +121,14 @@ def main():
         ],
         device=device,
         dtype=torch.float32)
+    
     actions_scale = torch.tensor([
         0.125, 0.25, 0.25,
         0.125, 0.25, 0.25,
         0.125, 0.25, 0.25,
         0.125, 0.25, 0.25,
         5.0, 5.0, 5.0, 5.0], device=device, dtype=torch.float32)
+    
     actions = torch.zeros(16, device=device, dtype=torch.float32)
 
     # from IPython import embed; embed()
