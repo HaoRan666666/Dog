@@ -2,7 +2,6 @@ import argparse
 import torch
 import mujoco
 import mujoco.viewer
-import numpy as np
 import time
 import os
 
@@ -117,76 +116,45 @@ def main():
 
     actions = torch.zeros(12, device=device, dtype=torch.float32)
 
-    # 对齐 Isaac Lab 控制频率: dt=1/120, decimation=2 → 控制周期=1/60≈0.01667s
-    # MuJoCo timestep=0.002, 0.01667/0.002≈8 步/控制周期
+    decimation = 8
+
+    # ── 初始化到站立姿态 ──────────────────────────────────────────
+    bf_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, "base_freejoint")
+    bf_adr = m.jnt_qposadr[bf_id]
+    d.qpos[bf_adr:bf_adr + 7] = [0.0, 0.0, 0.42, 1.0, 0.0, 0.0, 0.0]
+    standing_ctrl = default_dof_pos.cpu().numpy()
+    for i, name in enumerate(joint_names):
+        j_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, name)
+        d.qpos[m.jnt_qposadr[j_id]] = standing_ctrl[i]
+        d.ctrl[i] = standing_ctrl[i]
+    for _ in range(500):
+        mujoco.mj_step(m, d)
+
+    commands = [0.0, 0.0, 0.0]  # 前进 1m/s
 
     with mujoco.viewer.launch_passive(m, d) as viewer:
         while viewer.is_running():
             obs = get_obs(actions=actions,
-                          default_dof_pos=default_dof_pos)
+                          default_dof_pos=default_dof_pos,
+                          commands=commands)
             obs = torch.clip(obs, -100, 100)
 
             actions = loaded_policy(obs)
 
             act = actions * actions_scale + default_dof_pos
-            act = torch.clip(act, -100, 100)
-            # print("actions:", act)
-            act = act.detach().cpu().numpy()
+            act = torch.clip(act, -100, 100).detach().cpu().numpy()
             for i in range(12):
                 d.ctrl[i] = act[i]
 
-            # 执行一步模拟
             step_start = time.time()
-            for i in range(8):
+            for _ in range(decimation):
                 mujoco.mj_step(m, d)
-            # 更新渲染
+
             viewer.sync()
-            # 同步时间
-            time_until_next_step = m.opt.timestep*8 - (time.time() - step_start)
+
+            time_until_next_step = m.opt.timestep * decimation - (time.time() - step_start)
             if time_until_next_step > 0:
                 time.sleep(time_until_next_step)
-
-    # ── 初始化机器人到站立姿态 ─────────────────────────────────────
-    # # 设置基座高度 → Isaac Lab init_state pos z=0.42 (匹配 XML)
-    # base_freejoint_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, "base_freejoint")
-    # base_qpos_adr = m.jnt_qposadr[base_freejoint_id]
-    # d.qpos[base_qpos_adr:base_qpos_adr + 7] = [0.0, 0.0, 0.42, 1.0, 0.0, 0.0, 0.0]
-    # # 设置关节到站立角度 + 施加 PD 控制保持姿态
-    # standing_ctrl = default_dof_pos.cpu().numpy()
-    # for i, name in enumerate(joint_names):
-    #     joint_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, name)
-    #     d.qpos[m.jnt_qposadr[joint_id]] = standing_ctrl[i]
-    #     d.ctrl[i] = standing_ctrl[i]
-    # # 稳定物理（PD 控制保持站立）
-    # for _ in range(500):
-    #     mujoco.mj_step(m, d)
-
-    # with mujoco.viewer.launch_passive(m, d) as viewer:
-    #     while viewer.is_running():
-    #         # 构建观测（关节顺序与 MuJoCo actuator 一致）
-    #         obs = get_obs(actions=actions, default_dof_pos=default_dof_pos)
-    #         obs = torch.clip(obs, -100, 100)
-
-    #         # 策略推理
-    #         actions = loaded_policy(obs)
-
-    #         # 计算关节目标位置: raw_action * scale + default_joint_pos
-    #         act = actions * actions_scale + default_dof_pos
-    #         act = torch.clip(act, -100, 100)
-    #         act = act.detach().cpu().numpy()
-    #         for i in range(12):
-    #             d.ctrl[i] = act[i]
-
-    #         step_start = time.time()
-    #         for _ in range(decimation):
-    #             mujoco.mj_step(m, d)
-
-    #         viewer.sync()
-
-    #         time_until_next_step = m.opt.timestep * decimation - (time.time() - step_start)
-    #         if time_until_next_step > 0:
-    #             time.sleep(time_until_next_step)
-
 
 if __name__ == "__main__":
     main()
