@@ -20,10 +20,10 @@ class PPORunnerCfg(RslRlOnPolicyRunnerCfg):  # 继承 On-Policy Runner 基类，
     experiment_name = "RP_wd_walk_flat"  # 实验名称，日志根目录为 logs/rsl_rl/rcdog_walk_flat/
     policy = RslRlPpoActorCriticCfg(  # Actor-Critic 策略网络配置
         init_noise_std=1.0,  # 初始动作噪声标准差（PPO 探索用），训练初期大噪声鼓励探索，后期逐渐衰减
-        actor_obs_normalization=False,  # Actor 是否对观测做经验归一化（running mean/std），False 表示不使用
-        critic_obs_normalization=False,  # Critic 是否对观测做经验归一化，False 表示不使用
-        actor_hidden_dims=[32, 32],  # Actor 隐藏层维度：[输入→32]→[32→32]→[32→12]，两层 ELU + 线性输出
-        critic_hidden_dims=[32, 32],  # Critic 隐藏层维度：[输入→32]→[32→32]→[32→1]，输出单个 value 标量
+        actor_obs_normalization=True,  # Actor 是否对观测做经验归一化（running mean/std），False 表示不使用
+        critic_obs_normalization=True,  # Critic 是否对观测做经验归一化，False 表示不使用
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
         activation="elu",  # 激活函数用 ELU（Exponential Linear Unit），比 ReLU 更平滑，训练更稳定
     )
     algorithm = RslRlPpoAlgorithmCfg(  # PPO 算法超参数配置

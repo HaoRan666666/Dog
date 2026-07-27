@@ -207,7 +207,7 @@ def main():
     if args_cli.checkpoint:
         resume_path = args_cli.checkpoint
     else:
-        resume_path = get_checkpoint_path("logs/rsl_rl/bpx_walk_flat", ".*", "model_.*.pt")
+        resume_path = get_checkpoint_path("logs/rsl_rl/RP_wd_walk_flat", ".*", "model_.*.pt")
     print(f"Checkpoint: {resume_path}")
 
     # ── 创建环境 ──────────────────────────────────────────────────

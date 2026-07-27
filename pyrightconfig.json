@@ -1,0 +1,13 @@
+{
+    "extraPaths": [
+        "/home/rp/miniconda3/envs/env_isaaclab/lib/python3.11/site-packages/isaaclab/source/isaaclab",
+        "/home/rp/miniconda3/envs/env_isaaclab/lib/python3.11/site-packages/isaaclab/source/isaaclab_rl",
+        "/home/rp/miniconda3/envs/env_isaaclab/lib/python3.11/site-packages/isaaclab/source/isaaclab_tasks",
+        "/home/rp/miniconda3/envs/env_isaaclab/lib/python3.11/site-packages/isaaclab/source/isaaclab_mimic",
+        "/home/rp/miniconda3/envs/env_isaaclab/lib/python3.11/site-packages/isaaclab/source/isaaclab_assets"
+    ],
+    "venvPath": "/home/rp/miniconda3/envs",
+    "venv": "env_isaaclab",
+    "pythonVersion": "3.11",
+    "typeCheckingMode": "basic"
+}

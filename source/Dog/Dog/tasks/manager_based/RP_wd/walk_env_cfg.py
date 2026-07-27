@@ -69,6 +69,7 @@ class SceneCfg(InteractiveSceneCfg):
             texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
         ),
     )
+    
    
 
 @configclass
@@ -76,24 +77,18 @@ class CommandsCfg: #MDP（马尔可夫决策过程）指令生成器的配置类
     """Command specifications for the MDP."""
 
     base_velocity = mdp.UniformLevelVelocityCommandCfg(
-        asset_name="robot",#这些指令是发给场景中名为 "robot" 的资产（一般就是机器人）需要和 SceneCfg 中的 prim_path 匹配
-        resampling_time_range=(5.0, 5.0),#每 10 秒重新生成一次新的目标速度命令（恒定时间）。
-        rel_standing_envs=0.1,#2% 的环境（sub-env）保持"站立不动"命令 = (0,0,0)。
-        rel_heading_envs=1.0,#100% 的环境具有 heading command（方向控制要求）。
-        heading_command=True,#机器人不仅需要跟随速度，还需要跟随一个地面航向角。
-        heading_control_stiffness=0.5,#用于 heading 控制的 soft-weight / gain：0：不太在意1：非常严格要求朝向
-        debug_vis=True,#在 Isaac Sim 里实时可视化命令向量（箭头、指示方向）。
-        # ranges=mdp.UniformVelocityCommandCfg.Ranges(
-        # lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
-        # #速度命令的采样范围
-        # ),
-
-#基于课程的速度指令
+        asset_name="robot",
+        resampling_time_range=(5.0, 5.0),
+        rel_standing_envs=0.1,
+        rel_heading_envs=1.0,
+        heading_command=True,
+        heading_control_stiffness=0.5,
+        debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.1, 0.1), lin_vel_y=(-0.1, 0.1), ang_vel_z=(-1.5, 1.5) ,heading=(-math.pi, math.pi)
+            lin_vel_x=(-0.1, 0.1), lin_vel_y=(-0.1, 0.1), ang_vel_z=(-1.5, 1.5), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-2.5, 2.5), lin_vel_y=(-2.0, 2.0), ang_vel_z=(-1.5,1.5)
+            lin_vel_x=(-2.5, 2.5), lin_vel_y=(-2.0, 2.0), ang_vel_z=(-1.5, 1.5)
         ),
     )
 
@@ -187,7 +182,7 @@ class RewardsCfg:
 #     #关节加速度
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
 #     # #动作变化
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.1)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
     energy = RewTerm(func=mdp.energy, weight=-2e-4,
                      params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
     # feet_air_time = RewTerm(
@@ -202,7 +197,7 @@ class RewardsCfg:
     undesired_contacts = RewTerm(  #大腿接触力大于阈值则受到惩罚
         func=mdp.undesired_contacts,
         weight=-10.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces",body_names=["base_link", ".*HIP_LINK", ".*KENN_LINK"]), "threshold": 1.0},
+        params={"sensor_cfg": SceneEntityCfg("contact_forces",body_names=["base_link", ".*HIP_LINK", ".*KENN_LINK"]), "threshold": 5.0},
     )
 #     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-2.5)
@@ -221,23 +216,24 @@ class RewardsCfg:
         },
     )
 
-    stand_still = RewTerm(
-        func=mdp.stand_still_joint_deviation_l1,
-        weight=-1,
-        params={
-                "command_name": "base_velocity",
-                "command_threshold": 0.1,
-                "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
-              },
-    ) 
 
-    base_height_l2 = RewTerm(
-        func=mdp.base_height_l2,
-        weight=-1.0,
-        params={
-            "target_height": 0.3,
-        },
-    )
+    # stand_still = RewTerm(
+    #     func=mdp.stand_still_joint_deviation_l1,
+    #     weight=-1.2,
+    #     params={
+    #             "command_name": "base_velocity",
+    #             "command_threshold": 0.1,
+    #             "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+    #           },
+    # ) 
+
+    # base_height_l2 = RewTerm(
+    #     func=mdp.base_height_l2,
+    #     weight=-1.0,
+    #     params={
+    #         "target_height": 0.3,
+    #     },
+    # )
 
     # wheel_vel_penalty = RewTerm(
     #     func=mdp.wheel_vel_penalty,
@@ -529,12 +525,12 @@ class RP_wd_Walk_Flat_Env(ManagerBasedRLEnvCfg):
     def __post_init__(self) -> None:
         """初始化后回调：设置仿真步长、回合长度等参数。"""
         # 通用设置
-        self.decimation = 2                       # 每 2 步物理仿真执行一次控制
-        self.episode_length_s = 8                 # 每个 episode 最大时长 (s)
+        self.decimation = 8                       # 每 8 步物理仿真执行一次控制
+        self.episode_length_s = 12                # 每个 episode 最大时长 (s)
         # 视角设置
         self.viewer.eye = (8.0, 0.0, 5.0)        # 相机默认位置 (x, y, z)
         # 仿真设置
-        self.sim.dt = 1 / 120                     # 物理仿真步长 (s)
+        self.sim.dt = 0.0025                      # 物理 400Hz，控制 400/8=50Hz
         self.sim.render_interval = self.decimation # 渲染间隔
 
 
@@ -546,10 +542,10 @@ class RP_wd_Walk_Flat_Env_Play(RP_wd_Walk_Flat_Env):
         self.scene.num_envs=1
         self.scene.env_spacing=2.5
 
-        self.decimation = 2
+        self.decimation = 8
         self.episode_length_s = 40
         self.viewer.eye = (8.0, 0.0, 5.0)
-        self.sim.dt = 1 / 120
+        self.sim.dt = 0.0025
         self.sim.render_interval = self.decimation
 
         self.observations.policy.enable_corruption = False
