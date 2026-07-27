@@ -9,10 +9,10 @@ import isaaclab.terrains as terrain_gen
 
 from isaaclab.terrains.terrain_generator_cfg import TerrainGeneratorCfg
 STEP_TERRAINS_CFG = TerrainGeneratorCfg(
-    size=(1.0, 1.0), #每个子地形区域大小
+    size=(8.0, 8.0), #每个子地形区域大小
     border_width=20.0,
     num_rows=10,
-    num_cols=20,
+    num_cols=10,
     horizontal_scale=0.1,
     vertical_scale=0.005,
     slope_threshold=0.75,
@@ -58,51 +58,3 @@ STEP_TERRAINS_CFG = TerrainGeneratorCfg(
         ),
     },
 )
-
-
-SLOPE_TERRAINS_CFG = TerrainGeneratorCfg(
-    size=(8.0, 8.0),
-    border_width=20.0,
-    num_rows=10,
-    num_cols=20,
-    horizontal_scale=0.1,
-    vertical_scale=0.005,
-    slope_threshold=0.75,
-    curriculum=True,
-    difficulty_range=(0.0, 1.0),
-    use_cache=False,
-    sub_terrains={
-        "repeated_slopes": terrain_gen.MeshRepeatedBoxesTerrainCfg(
-            proportion=1.0,
-            object_params_start=terrain_gen.MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                num_objects=1,
-                height=0.02,
-                size=(6.0, 6.0),
-                max_yx_angle=5.0,
-                degrees=True,
-            ),
-            object_params_end=terrain_gen.MeshRepeatedBoxesTerrainCfg.ObjectCfg(
-                num_objects=1,
-                height=0.02,
-                size=(6.0, 6.0),
-                max_yx_angle=20.0,
-                degrees=True,
-            ),
-            platform_width=2.0,
-        ),
-    },
-)
-
-"""Step-focused terrain configuration for L1 quadruped locomotion training.
-
-Terrain types:
-  - **pyramid_stairs**: Ascending staircase pyramid centered on a flat platform.
-  - **pyramid_stairs_inv**: Inverted (descending) staircase pyramid.
-  - **boxes**: Random grid of raised boxes the robot must step over.
-  - **repeated_boxes**: Scattered boxes that grow in number and height with difficulty.
-
-Curriculum:
-  Difficulty ranges from 0.0 (easiest, ~2 cm steps) to 1.0 (hardest, ~15 cm steps).
-  The L1 robot stands at approximately 0.4 m, so the hardest steps are about 37.5%
-  of standing height.
-"""

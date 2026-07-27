@@ -23,8 +23,12 @@ from . import mdp
 ##
 # 预定义配置导入
 ##
-from Dog.robots.RP_wd import RP_wd_CFG
+from Dog.robots.RP_wd import RP_wd_CFG 
 from Dog.assets.terrain.step_terrain import STEP_TERRAINS_CFG
+
+LEG_JOINTS = [".*_ABAD_JOINT", ".*_HIP_JOINT", ".*_KENN_JOINT"]
+WHEEL_JOINTS = [".*_FOOT_JOINT"]
+
 # ── 场景配置（平地步态用）──────────────────────────────────────────
 @configclass
 class SceneCfg(InteractiveSceneCfg):
@@ -41,16 +45,12 @@ class SceneCfg(InteractiveSceneCfg):
             static_friction=1.0, #这两个是摩擦力参数，
             dynamic_friction=1.0,
         ),
-         visual_material=sim_utils.MdlFileCfg(
+        visual_material=sim_utils.MdlFileCfg(
             mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
             project_uvw=True,
             texture_scale=(0.25, 0.25),
         ),
         debug_vis=False,#关闭调试可视化,（打开后发现显示了每个机器人的世界坐标系）
-        visual_material =sim_utils.MdlFileCfg(
-        mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
-        project_uvw=True,
-    ),
    )
    robot = RP_wd_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
    height_scanner = RayCasterCfg(
@@ -93,7 +93,7 @@ class CommandsCfg: #MDP（马尔可夫决策过程）指令生成器的配置类
             lin_vel_x=(-0.1, 0.1), lin_vel_y=(-0.1, 0.1), ang_vel_z=(-1.5, 1.5) ,heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-2.5, 2,5), lin_vel_y=(-2.0, 2.0), ang_vel_z=(-1.5,1.5)
+            lin_vel_x=(-2.5, 2.5), lin_vel_y=(-2.0, 2.0), ang_vel_z=(-1.5,1.5)
         ),
     )
 
@@ -109,7 +109,7 @@ class ObservationsCfg:
         )
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01),
-                            params={"asset_cfg": SceneEntityCfg("robot", joint_names="^(?!.FOOT).*")})
+                            params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
         actions = ObsTerm(func=mdp.last_action)
         # height_scan = ObsTerm(
@@ -119,11 +119,9 @@ class ObservationsCfg:
         #     clip=(-1.0, 1.0),
         # )
         def __post_init__(self):
+            self.history_length = 3
             self.enable_corruption = True
             self.concatenate_terms = True
-
-    # observation groups
-    policy: PolicyCfg = PolicyCfg()
 
 
     @configclass
@@ -139,21 +137,23 @@ class ObservationsCfg:
         )
         # root_local_rot_tan_norm = ObsTerm(func=mdp.root_local_rot_tan_norm)
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01),
+                            params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
         actions = ObsTerm(func=mdp.last_action)
-        height_scan = ObsTerm(
-            func=mdp.height_scan,
-            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-            noise=Unoise(n_min=-0.1, n_max=0.1),
-            clip=(-1.0, 1.0),
-        )
+        # height_scan = ObsTerm(
+        #     func=mdp.height_scan,
+        #     params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+        #     noise=Unoise(n_min=-0.1, n_max=0.1),
+        #     clip=(-1.0, 1.0),
+        # )
 
         def __post_init__(self):
             self.history_length = 3
             self.enable_corruption = False
             self.concatenate_terms = True
-    
+
+    policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
     
 
@@ -161,9 +161,9 @@ class ObservationsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 #策略网络输出的 action 是什么格式，以及如何把神经网络的输出映射到机器人关节上。
-    joint_pos_abad = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_ABAD_JOINT"], scale=0.125, use_default_offset=True)
-    joint_pos_legs = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"], scale=0.25, use_default_offset=True)
-    joint_pos_wheels = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_FOOT_JOINT"], scale=1.0, use_default_offset=True)
+    joint_pos_abad = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_ABAD_JOINT"], scale=0.125, use_default_offset=True,preserve_order=True)
+    joint_pos_legs = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"], scale=0.25, use_default_offset=True,preserve_order=True)
+    joint_pos_wheels = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=[".*_FOOT_JOINT"], scale=5.0, use_default_offset=False,preserve_order=True)
 #use_default_offset=True  让机器人动作中心从"0"变成"默认站立姿态"。
 @configclass
 class RewardsCfg:
@@ -183,22 +183,22 @@ class RewardsCfg:
     ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.03)
     # #电机力矩
     dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-1.0e-5,
-                             params={"asset_cfg": SceneEntityCfg("robot", joint_names="^(?!.FOOT).*")})
+                             params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
 #     #关节加速度
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
 #     # #动作变化
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.1)
-    energy = RewTerm(func=mdp.energy, weight=-2e-5,
-                     params={"asset_cfg": SceneEntityCfg("robot", joint_names="^(?!.FOOT).*")})
-    feet_air_time = RewTerm(
-        func=mdp.feet_air_time,
-        weight=-1,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-            "command_name": "base_velocity",
-            "threshold": 0.5,
-        },
-    )
+    energy = RewTerm(func=mdp.energy, weight=-2e-4,
+                     params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
+    # feet_air_time = RewTerm(
+    #     func=mdp.feet_air_time,
+    #     weight=-1,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+    #         "command_name": "base_velocity",
+    #         "threshold": 0.5,
+    #     },
+    # )
     undesired_contacts = RewTerm(  #大腿接触力大于阈值则受到惩罚
         func=mdp.undesired_contacts,
         weight=-10.0,
@@ -208,14 +208,14 @@ class RewardsCfg:
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-2.5)
     joint_pos_limits = RewTerm(
         func=mdp.joint_pos_limits, weight=-20.0, 
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names="^(?!.FOOT).*")}
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)}
     )
 
     joint_pos = RewTerm(
         func=mdp.joint_position_penalty,
         weight=-0.7,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names="^(?!.FOOT).*"),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
             "stand_still_scale": 5.0,
             "velocity_threshold": 0.3,
         },
@@ -227,7 +227,7 @@ class RewardsCfg:
         params={
                 "command_name": "base_velocity",
                 "command_threshold": 0.1,
-                "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+                "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
               },
     ) 
 
@@ -239,17 +239,17 @@ class RewardsCfg:
         },
     )
 
-    wheel_vel_penalty = RewTerm(
-        func=mdp.wheel_vel_penalty,
-        weight=-0.05,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-            "command_name": "base_velocity",
-            "velocity_threshold": 0.5,
-            "command_threshold": 0.1,
-            "asset_cfg": SceneEntityCfg("robot", joint_names=".*FOOT_JOINT"),
-        },
-    )
+    # wheel_vel_penalty = RewTerm(
+    #     func=mdp.wheel_vel_penalty,
+    #     weight=-0.05,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+    #         "command_name": "base_velocity",
+    #         "velocity_threshold": 0.5,
+    #         "command_threshold": 0.1,
+    #         "asset_cfg": SceneEntityCfg("robot", joint_names=".*FOOT_JOINT"),
+    #     },
+    # )
 #     trotting_rew= RewTerm(
 #         func= mdp.GaitReward,
 #         weight= 0.2,

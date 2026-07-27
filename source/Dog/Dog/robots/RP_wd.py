@@ -23,10 +23,17 @@ RP_wd_CFG = ArticulationCfg(
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
             enabled_self_collisions=False,
-            solver_position_iteration_count=4,
-            solver_velocity_iteration_count=0,
+            solver_position_iteration_count=6,
+            solver_velocity_iteration_count=2,
             fix_root_link=False,
         ),
+        collision_props=sim_utils.CollisionPropertiesCfg(
+            contact_offset=0.01, rest_offset=0.0,
+            torsional_patch_radius=0.01, min_torsional_patch_radius=0.003,
+        ),
+            joint_drive_props = sim_utils.JointDrivePropertiesCfg(
+            drive_type="force", max_effort=42, max_velocity=10
+            ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.45),
@@ -43,7 +50,7 @@ RP_wd_CFG = ArticulationCfg(
         "LEGS": DelayedPDActuatorCfg(
             joint_names_expr=LEG_JOINTS,
             min_delay=0,
-            max_delay=2,
+            max_delay=0,
             effort_limit={".*": 42},
             effort_limit_sim={".*": 42},
             velocity_limit={".*": 10},
@@ -56,13 +63,13 @@ RP_wd_CFG = ArticulationCfg(
         "WHEELS": DelayedPDActuatorCfg(
             joint_names_expr=WHEEL_JOINTS,
             min_delay=0,
-            max_delay=2,
+            max_delay=0,
             effort_limit={".*": 17},
             effort_limit_sim={".*": 17},
             velocity_limit={".*": 42},
             velocity_limit_sim={".*": 42},
-            stiffness={".*": 5.0},
-            damping={".*": 2},
+            stiffness={".*":0},
+            damping={".*": 3},
             armature={".*": 0.01},
             friction={".*": 0.01},
         ),

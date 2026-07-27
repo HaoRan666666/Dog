@@ -10,13 +10,15 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 from Dog.assets.terrain.step_terrain import STEP_TERRAINS_CFG
 
+from . import mdp
 from .walk_env_cfg import (
     RP_wd_Walk_Flat_Env,
     SceneCfg,
     ObservationsCfg,
     CurriculumCfg,
 )
-
+LEG_JOINTS = [".*_ABAD_JOINT", ".*_HIP_JOINT", ".*_KENN_JOINT"]
+WHEEL_JOINTS = [".*_FOOT_JOINT"]
 
 @configclass
 class TerrainSceneCfg(SceneCfg):
@@ -52,15 +54,15 @@ class TerrainSceneCfg(SceneCfg):
 class TerrainObservationsCfg(ObservationsCfg):
     @configclass
     class PolicyCfg(ObsGroup):
-        base_ang_vel = ObsTerm(func="mdp.base_ang_vel", noise=Unoise(n_min=-0.2, n_max=0.2))
-        projected_gravity = ObsTerm(func="mdp.projected_gravity", noise=Unoise(n_min=-0.05, n_max=0.05))
-        velocity_commands = ObsTerm(func="mdp.generated_commands", params={"command_name": "base_velocity"})
-        joint_pos = ObsTerm(func="mdp.joint_pos_rel", noise=Unoise(n_min=-0.01, n_max=0.01),
-                            params={"asset_cfg": SceneEntityCfg("robot", joint_names="^(?!.FOOT).*")})
-        joint_vel = ObsTerm(func="mdp.joint_vel_rel", noise=Unoise(n_min=-1.5, n_max=1.5))
-        actions = ObsTerm(func="mdp.last_action")
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
+        projected_gravity = ObsTerm(func=mdp.projected_gravity, noise=Unoise(n_min=-0.05, n_max=0.05))
+        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01),
+                            params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
+        actions = ObsTerm(func=mdp.last_action)
         height_scan = ObsTerm(
-            func="mdp.height_scan",
+            func=mdp.height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
             noise=Unoise(n_min=-0.1, n_max=0.1),
             clip=(-1.0, 1.0),
@@ -75,7 +77,7 @@ class TerrainObservationsCfg(ObservationsCfg):
 
 @configclass
 class TerrainCurriculumCfg(CurriculumCfg):
-    terrain_levels = CurrTerm(func="mdp.terrain_levels_vel")
+    terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
 
 
 @configclass
