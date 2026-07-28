@@ -136,12 +136,12 @@ class ObservationsCfg:
                             params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
         actions = ObsTerm(func=mdp.last_action)
-        # height_scan = ObsTerm(
-        #     func=mdp.height_scan,
-        #     params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-        #     noise=Unoise(n_min=-0.1, n_max=0.1),
-        #     clip=(-1.0, 1.0),
-        # )
+        height_scan = ObsTerm(
+            func=mdp.height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            noise=Unoise(n_min=-0.1, n_max=0.1),
+            clip=(-1.0, 1.0),
+        )
 
         def __post_init__(self):
             self.history_length = 3
@@ -208,7 +208,7 @@ class RewardsCfg:
 
     joint_pos = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.7,
+        weight=-0.3,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
             "stand_still_scale": 5.0,
@@ -217,15 +217,15 @@ class RewardsCfg:
     )
 
 
-    # stand_still = RewTerm(
-    #     func=mdp.stand_still_joint_deviation_l1,
-    #     weight=-1.2,
-    #     params={
-    #             "command_name": "base_velocity",
-    #             "command_threshold": 0.1,
-    #             "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
-    #           },
-    # ) 
+    stand_still = RewTerm(
+        func=mdp.stand_still_joint_deviation_l1,
+        weight=-1,
+        params={
+                "command_name": "base_velocity",
+                "command_threshold": 0.1,
+                "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+              },
+    ) 
 
     # base_height_l2 = RewTerm(
     #     func=mdp.base_height_l2,
@@ -235,17 +235,19 @@ class RewardsCfg:
     #     },
     # )
 
-    # wheel_vel_penalty = RewTerm(
-    #     func=mdp.wheel_vel_penalty,
-    #     weight=-0.05,
-    #     params={
-    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-    #         "command_name": "base_velocity",
-    #         "velocity_threshold": 0.5,
-    #         "command_threshold": 0.1,
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names=".*FOOT_JOINT"),
-    #     },
-    # )
+    wheel_vel_penalty = RewTerm(
+        func=mdp.wheel_vel_penalty,
+        weight=-0.05,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+            "command_name": "base_velocity",
+            "velocity_threshold": 0.5,
+            "command_threshold": 0.1,
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*FOOT_JOINT"),
+        },
+    )
+
+
 #     trotting_rew= RewTerm(
 #         func= mdp.GaitReward,
 #         weight= 0.2,
@@ -629,46 +631,5 @@ class RP_wd_Walk_Flat_Env_Play(RP_wd_Walk_Flat_Env):
 
         # Play 模式不需要 curriculum
         self.curriculum = None
-
-
-MAP_USD = "/home/xhr/dog/Dog/source/Dog/Dog/assets/terrain/complete_enue_mesh.usd"
-
-
-@configclass
-class RCdogMapSceneCfg(SceneCfg):
-    terrain_map = AssetBaseCfg(
-        prim_path="/World/terrain_map",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=MAP_USD,
-            scale=(0.1, 0.1, 0.1),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(
-                rigid_body_enabled=True,
-                kinematic_enabled=True,
-            ),
-        ),
-        init_state=AssetBaseCfg.InitialStateCfg(
-            pos=(0.0, 0.0, 0.0),
-        ),
-        collision_group=-1,
-    )
-
-
-@configclass
-class RP_wd_Terrain_Play_Env(RP_wd_Walk_Flat_Env):
-    scene: RCdogMapSceneCfg = RCdogMapSceneCfg(num_envs=1, env_spacing=2.5)
-
-    def __post_init__(self) -> None:
- 
-
-        self.decimation = 2
-        self.episode_length_s = 40
-        self.viewer.eye = (20.0, 20.0, 15.0)
-        self.sim.dt = 1 / 120
-        self.sim.render_interval = self.decimation
-
-        self.observations.policy.enable_corruption = False
-
-        self.scene.robot.init_state.pos = (0.0, 0.0, 2.0)
-        self.events.reset_base = None
 
 

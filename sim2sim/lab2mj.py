@@ -60,12 +60,13 @@ def get_obs(actions, default_dof_pos, commands=None):
         commands = [0.0, 0.0, 0.0]
     commands_scale = torch.tensor([1.0, 1.0, 1.0], device=device, dtype=torch.float32)
 
-    # imu 角速度（机体角速度）
-    imu_gyro = get_sensor_data("body_gyro")
     # 投影重力方向
     base_quat = get_sensor_data("body_quat")
     projected_gravity = world2self(base_quat,
                                    torch.tensor([0.0, 0.0, -1.0], device=device, dtype=torch.float32))
+    # imu 角速度: gyro 传感器返回世界坐标系角速度 → 转到机体坐标系
+    gyro_world = get_sensor_data("body_gyro")
+    imu_gyro = world2self(base_quat, gyro_world)
     # 关节位置与速度（Isaac Lab 顺序）
     dof_pos = torch.zeros(12, device=device, dtype=torch.float32)
     dof_vel = torch.zeros(12, device=device, dtype=torch.float32)
