@@ -9,6 +9,7 @@ from isaaclab.sensors import RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+import math
 
 from Dog.assets.terrain.step_terrain import STEP_TERRAINS_CFG
 
@@ -45,7 +46,10 @@ class TerrainSceneCfg(SceneCfg):
     )
     height_scanner = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
+        offset=RayCasterCfg.OffsetCfg(
+            pos=(0.3, 0.0, 0.4),               # 前上方，射线斜前方覆盖
+            rot=(0.9537, 0.0, 0.3007, 0.0),    # 绕Y轴前倾35°，射线斜前下方探测
+        ),
         ray_alignment="yaw",
         pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
         debug_vis=False,
@@ -73,20 +77,21 @@ class TerrainObservationsCfg(ObservationsCfg):
 
 @configclass
 class TerrainCommandsCfg:
-    """地形环境的指令配置：低速行走，便于在复杂地形上学习。"""
+    """地形环境的指令配置：加入 yaw 控制，提升复杂地形上的转向能力。"""
 
     base_velocity = mdp.UniformLevelVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(5.0, 5.0),
         rel_standing_envs=0.05,
-        rel_heading_envs=0.0,
-        heading_command=False,
+        rel_heading_envs=1.0,
+        heading_command=True,
+        heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.5, 0.5), lin_vel_y=(-0.3, 0.3), ang_vel_z=(0.0, 0.0)
+            lin_vel_x=(-0.5, 0.5), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.5, 0.5), lin_vel_y=(-0.3, 0.3), ang_vel_z=(0.0, 0.0)
+            lin_vel_x=(-0.5, 0.5), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0)
         ),
     )
 
@@ -110,9 +115,23 @@ class TerrainRewardsCfg(RewardsCfg):
     flat_orientation_l2 = RewTerm(
         func=mdp.flat_orientation_l2, weight=-1)  # 平地 -2.5
 
-    # ── 移除：台阶上关节偏移不可避免 ──
-    # joint_pos = None              # 平地 -0.3，惩罚关节偏离默认位
+    # ── 降权重：台阶上允许更大关节偏移，但要保留一定约束 ──
+    joint_pos = RewTerm(
+        func=mdp.joint_position_penalty,
+        weight=-0.1,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.3,
+        },
+    )
     # stand_still = None            # 平地 -1.0，静止时惩罚关节偏移
+
+    # ── 降权重：台阶需要更大关节行程，放宽极限惩罚 ──
+    joint_pos_limits = RewTerm(
+        func=mdp.joint_pos_limits, weight=-5.0,       # 平地 -20.0
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)},
+    )
 
 
 @configclass
