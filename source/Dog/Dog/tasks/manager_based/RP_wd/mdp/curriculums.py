@@ -43,6 +43,27 @@ def terrain_levels_vel(
     return torch.mean(terrain.terrain_levels.float())
 
 
+def terrain_levels_vel_easy(
+    env: ManagerBasedRLEnv, env_ids: Sequence[int],
+    upgrade_divisor: float = 4.0,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """与原版相同，但升级门槛更宽松：size / upgrade_divisor（默认 8/4=2m）。
+
+    适用于慢速指令 + 短 episode 的场景。
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    terrain: TerrainImporter = env.scene.terrain
+    command = env.command_manager.get_command("base_velocity")
+    distance = torch.norm(asset.data.root_pos_w[env_ids, :2] - env.scene.env_origins[env_ids, :2], dim=1)
+    # 升级门槛从 size/2 降到 size/4（默认 2m）
+    move_up = distance > terrain.cfg.terrain_generator.size[0] / upgrade_divisor
+    move_down = distance < torch.norm(command[env_ids, :2], dim=1) * env.max_episode_length_s * 0.5
+    move_down *= ~move_up
+    terrain.update_env_origins(env_ids, move_up, move_down)
+    return torch.mean(terrain.terrain_levels.float())
+
+
 #宇树开源
 def lin_vel_cmd_levels(
     env: ManagerBasedRLEnv,

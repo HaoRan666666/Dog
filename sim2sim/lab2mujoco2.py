@@ -232,7 +232,7 @@ def main():
     with mujoco.viewer.launch_passive(m, d) as viewer:
 
         while viewer.is_running():
-            commands = (0.0, 1.0, 0.0)
+            commands = (2.0, 0.0, .0)
 
             single_obs = get_single_obs(actions=actions, commands=commands)
             history.append(single_obs)

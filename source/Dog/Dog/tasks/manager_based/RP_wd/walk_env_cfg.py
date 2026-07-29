@@ -197,7 +197,7 @@ class RewardsCfg:
     undesired_contacts = RewTerm(  #大腿接触力大于阈值则受到惩罚
         func=mdp.undesired_contacts,
         weight=-10.0,
-        params={"sensor_cfg": SceneEntityCfg("contact_forces",body_names=["base_link", ".*HIP_LINK", ".*KENN_LINK"]), "threshold": 5.0},
+        params={"sensor_cfg": SceneEntityCfg("contact_forces",body_names=["base_link", ".*HIP_LINK", ".*KENN_LINK"]), "threshold": 1.0},
     )
 #     # -- optional penalties
     flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-2.5)

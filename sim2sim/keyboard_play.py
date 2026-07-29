@@ -40,6 +40,8 @@ parser.add_argument("--vy", type=float, default=1.0,
                     help="横移灵敏度")
 parser.add_argument("--wz", type=float, default=2.0,
                     help="转向灵敏度")
+parser.add_argument("--terrain-level", type=int, default=None,
+                    help="固定地形等级 (0~29)，不指定则随机")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -212,6 +214,18 @@ def main():
 
     # ── 创建环境 ──────────────────────────────────────────────────
     env = gym.make(args_cli.task, cfg=env_cfg)
+
+    # 强制地形等级（覆盖随机初始化）
+    if args_cli.terrain_level is not None:
+        terrain = env.unwrapped.scene.terrain
+        level = args_cli.terrain_level
+        terrain.terrain_levels[:] = level
+        terrain.env_origins[:] = terrain.terrain_origins[
+            terrain.terrain_levels[:].long(),
+            terrain.terrain_types[:].long(),
+        ]
+        print(f"地形等级设为: {level}")
+
     env = RslRlVecEnvWrapper(env)        # 包装为 RSL-RL 兼容格式
 
     # ── 加载训练好的策略 ───────────────────────────────────────────
