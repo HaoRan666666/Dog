@@ -88,10 +88,10 @@ class TerrainCommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.5, 0.5), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+            lin_vel_x=(-0.8, 0.8), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.5, 0.5), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0)
+            lin_vel_x=(-0.8, 0.8), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0)
         ),
     )
 
@@ -118,7 +118,7 @@ class TerrainRewardsCfg(RewardsCfg):
     # ── 降权重：台阶上允许更大关节偏移，但要保留一定约束 ──
     joint_pos = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.1,
+        weight=-0.02,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
             "stand_still_scale": 5.0,
@@ -129,9 +129,15 @@ class TerrainRewardsCfg(RewardsCfg):
 
     # ── 降权重：台阶需要更大关节行程，放宽极限惩罚 ──
     joint_pos_limits = RewTerm(
-        func=mdp.joint_pos_limits, weight=-5.0,       # 平地 -20.0
+        func=mdp.joint_pos_limits, weight=-2.0,       # 平地 -20.0
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)},
     )
+
+    # ── 移除/降权：摔倒时需要大动作、高扭矩、瞬时爆发来纠正 ──
+    action_rate_l2 = None                              # 平地 -0.01，移除动作变化惩罚
+    dof_acc_l2 = None                                  # 平地 -2.5e-7，移除加速度惩罚
+    energy = None                                      # 平地 -2e-4，移除能耗惩罚
+    dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-3e-6)  # 平地 -1e-5，降3倍
 
 
 @configclass

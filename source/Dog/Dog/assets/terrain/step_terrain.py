@@ -22,17 +22,17 @@ STEP_TERRAINS_CFG = TerrainGeneratorCfg(
     sub_terrains={
         "pyramid_stairs": terrain_gen.MeshPyramidStairsTerrainCfg(
             proportion=0.3,
-            step_height_range=(0.02, 0.15),
+            step_height_range=(0.02, 0.25),
             step_width=0.3,
-            platform_width=1.0,
+            platform_width=1.5,
             border_width=1.0,
             holes=False,
         ),
         "pyramid_stairs_inv": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
             proportion=0.3,
-            step_height_range=(0.02, 0.15),
+            step_height_range=(0.02, 0.25),
             step_width=0.3,
-            platform_width=1.0,
+            platform_width=1.5,
             border_width=1.0,
             holes=False,
         ),
@@ -40,7 +40,7 @@ STEP_TERRAINS_CFG = TerrainGeneratorCfg(
             proportion=0.2,
             grid_width=0.12,
             grid_height_range=(0.02, 0.12),
-            platform_width=1.0,
+            platform_width=1.5,
         ),
         "plane": terrain_gen.MeshPlaneTerrainCfg(
             proportion=0.2,
