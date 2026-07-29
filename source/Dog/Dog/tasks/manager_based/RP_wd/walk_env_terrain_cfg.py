@@ -99,7 +99,7 @@ class TerrainCommandsCfg:
 @configclass
 class TerrainCurriculumCfg(CurriculumCfg):
     """地形课程：只保留地形难度课程，取消速度课程。"""
-    terrain_levels = CurrTerm(func=mdp.terrain_levels_vel_easy)
+    terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
     lin_vel_cmd_levels = None  # 预训练后不需要速度课程，直接固定速度
 
 

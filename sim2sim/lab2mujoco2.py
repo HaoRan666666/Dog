@@ -195,7 +195,7 @@ def main():
     from collections import deque
 
     # ── 加载策略 ──────────────────────────────────────────────────
-    ckpt_path = "/home/rp/dog/Dog/logs/rsl_rl/RP_wd_walk_flat/2026-07-28_11-53-33/model_4999.pt"
+    ckpt_path = "/home/rp/model_server/model_1000.pt"
     try:
         actor = load_policy(ckpt_path)
         print(f"策略加载成功: {ckpt_path}")
@@ -232,7 +232,7 @@ def main():
     with mujoco.viewer.launch_passive(m, d) as viewer:
 
         while viewer.is_running():
-            commands = (2.0, 0.0, .0)
+            commands = (0.0, 0.0, .0)
 
             single_obs = get_single_obs(actions=actions, commands=commands)
             history.append(single_obs)
