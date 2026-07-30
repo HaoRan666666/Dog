@@ -11,7 +11,7 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import ContactSensorCfg
+from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
@@ -26,8 +26,22 @@ from Dog.robots.RPMini import RPMini_CFG
 
 # ── 关节分组 ──────────────────────────────────────────────────────────
 BODY_JOINTS = ["body_yaw_joint"]
-ARM_JOINTS = ["shoulder_.*", "elbow_.*"]
-LEG_JOINTS = ["thigh_.*", "knee_.*", "foot_.*"]
+ARM_JOINTS = [
+    "shoulder_left_pitch_joint", "shoulder_left_roll_joint",
+    "elbow_left_yaw_joint", "elbow_left_pitch_joint",
+    "shoulder_right_pitch_joint", "shoulder_right_roll_joint",
+    "elbow_right_yaw_joint", "elbow_right_pitch_joint",
+]
+LEG_JOINTS = [
+    "thigh_left_pitch_joint", "thigh_left_roll_joint",
+    "thigh_right_pitch_joint", "thigh_right_roll_joint",
+    "knee_left_yaw_joint", "knee_left_pitch_joint",
+    "knee_right_yaw_joint", "knee_right_pitch_joint",
+]
+FOOT_JOINTS = [
+    "foot_left_pitch_joint", "foot_left_roll_joint",
+    "foot_right_pitch_joint", "foot_right_roll_joint",
+]
 
 # ── 场景配置 ──────────────────────────────────────────────────────────
 @configclass
@@ -52,6 +66,23 @@ class SceneCfg(InteractiveSceneCfg):
     )
     robot = RPMini_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
     contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
+    # 左右脚掌高度扫描器
+    left_feet_scanner = RayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/foot_left_roll_Link",
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.05)),
+        ray_alignment="yaw",
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.01, size=[0.12, 0.04]),
+        debug_vis=False,
+        mesh_prim_paths=["/World/ground"],
+    )
+    right_feet_scanner = RayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/foot_right_roll_Link",
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.05)),
+        ray_alignment="yaw",
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.01, size=[0.12, 0.04]),
+        debug_vis=False,
+        mesh_prim_paths=["/World/ground"],
+    )
     sky_light = AssetBaseCfg(
         prim_path="/World/skyLight",
         spawn=sim_utils.DomeLightCfg(
@@ -146,7 +177,7 @@ class RewardsCfg:
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
     energy = RewTerm(func=mdp.energy, weight=-2e-4)
 
-    # -- 接触惩罚（双足没有大腿/小腿，只需防躯干和手臂触地）
+    # -- 接触惩罚
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
         weight=-20.0,
@@ -162,14 +193,57 @@ class RewardsCfg:
     # -- 关节约束
     joint_pos_limits = RewTerm(
         func=mdp.joint_pos_limits, weight=-20.0,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)}
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])}
     )
 
-    joint_pos = RewTerm(
+    # ── 关节偏离惩罚：四类不同权重 ─────────────────────────────────────
+    joint_deviation_hip = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.3,
+        weight=-0.03,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[
+                "thigh_left_roll_joint", "thigh_right_roll_joint",
+            ]),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.3,
+        },
+    )
+    joint_deviation_torso = RewTerm(
+        func=mdp.joint_position_penalty,
+        weight=-1.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[
+                "body_yaw_joint",
+                "shoulder_left_roll_joint", "shoulder_right_roll_joint",
+                "elbow_left_yaw_joint", "elbow_right_yaw_joint",
+                "elbow_left_pitch_joint", "elbow_right_pitch_joint",
+            ]),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.3,
+        },
+    )
+    joint_deviation_arms = RewTerm(
+        func=mdp.joint_position_penalty,
+        weight=-0.06,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[
+                "shoulder_left_pitch_joint", "shoulder_right_pitch_joint",
+            ]),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.3,
+        },
+    )
+    joint_deviation_legs = RewTerm(
+        func=mdp.joint_position_penalty,
+        weight=-0.01,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[
+                "thigh_left_pitch_joint", "thigh_right_pitch_joint",
+                "knee_left_yaw_joint", "knee_right_yaw_joint",
+                "knee_left_pitch_joint", "knee_right_pitch_joint",
+                "foot_left_pitch_joint", "foot_right_pitch_joint",
+                "foot_left_roll_joint", "foot_right_roll_joint",
+            ]),
             "stand_still_scale": 5.0,
             "velocity_threshold": 0.3,
         },
@@ -181,9 +255,49 @@ class RewardsCfg:
         params={
             "command_name": "base_velocity",
             "command_threshold": 0.1,
-            "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
         },
     )
+
+    feet_air_time = RewTerm(
+        func=mdp.feet_air_time_positive_biped,
+        weight=0.15,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*foot.*roll.*"), "threshold": 0.3},
+    )
+
+    feet_slide = RewTerm(
+        func=mdp.feet_slide,
+        weight=-0.2,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*foot.*roll.*"),
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*roll.*"),
+        },
+    )
+
+    feet_force = RewTerm(
+        func=mdp.body_force,
+        weight=-3e-3,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*foot.*roll.*"),
+            "threshold": 500,
+            "max_reward": 400,
+        },
+    )
+
+    feet_orientation_l2 = RewTerm(
+        func=mdp.body_orientation_l2,
+        weight=-0.1,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names=[".*foot.*roll.*"])},
+    )
+
+    feet_height = RewTerm(
+        func=mdp.feet_height,
+        weight=0.2,
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*foot.*roll.*"),
+                "asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*roll.*"),
+                "sensor_cfg1": SceneEntityCfg("left_feet_scanner"),
+                "sensor_cfg2": SceneEntityCfg("right_feet_scanner"),
+                "foot_height":0.04,"threshold":0.02})
 
 
 # ── 终止条件 ──────────────────────────────────────────────────────────

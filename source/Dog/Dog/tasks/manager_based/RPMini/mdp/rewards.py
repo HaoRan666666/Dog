@@ -129,3 +129,79 @@ def sound_suppression_acc_per_foot(
     cmd = env.command_manager.get_command(command_name)
     cmd_speed = torch.norm(cmd[:, :2], dim=1)
     return penalty * (cmd_speed < 1.5).float()
+
+
+def feet_air_time_positive_biped(env: BaseEnv, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    air_time = contact_sensor.data.current_air_time[:, sensor_cfg.body_ids]
+    is_contact = contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :].norm(dim=-1).max(dim=1)[0] > 1.0
+    contact_time = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids]
+    in_mode_time = torch.where(is_contact, contact_time, air_time)
+    single_stance = torch.sum(is_contact.int(), dim=1) == 1
+    reward = torch.min(torch.where(single_stance.unsqueeze(-1), in_mode_time, 0.0), dim=1)[0]
+    reward = torch.clamp(reward, min=0.0, max=threshold)
+    # no reward for zero command
+    cmd = env.command_manager.get_command("base_velocity")
+    reward *= (torch.norm(cmd[:, :2], dim=1) + torch.abs(cmd[:, 2])) > 0.01
+    reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
+    return reward
+
+
+
+def body_force(
+    env: BaseEnv, sensor_cfg: SceneEntityCfg, threshold: float = 500, max_reward: float = 400
+) -> torch.Tensor:
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    reward = torch.sum(torch.linalg.norm(contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids, :], dim=2), dim=1)
+    reward = (reward - threshold).clamp(min=0.0, max=max_reward)
+    return reward
+
+
+def body_orientation_l2(env: BaseEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    asset: Articulation = env.scene[asset_cfg.name]    
+    body_orientation = torch.stack(
+        [
+            math_utils.quat_apply_inverse(
+                asset.data.body_quat_w[:, body_id, :], asset.data.GRAVITY_VEC_W
+            )
+            for body_id in asset_cfg.body_ids
+            if body_id is not None
+        ],
+        dim=-1,
+    )
+    return torch.sum(torch.sum(torch.square(body_orientation[:, :2, :]), dim=1), dim=-1)
+
+
+def feet_height(env: BaseEnv, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"), sensor_cfg1: SceneEntityCfg | None = None,
+    sensor_cfg2: SceneEntityCfg | None = None, foot_height: float = 0.035, threshold: float = 0.05):
+    """
+    Calculates reward based on the clearance of the swing leg from the ground during movement.
+    Encourages appropriate lift of the feet during the swing phase of the gait.
+    """
+    # extract the used quantities (to enable type-hinting)
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    # compute the reward
+    contacts = contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :].norm(dim=-1).max(dim=1)[0] > 1.0
+    asset: Articulation = env.scene[asset_cfg.name]
+    feet_height = torch.stack(
+        [
+            env.scene[sensor.name].data.pos_w[:, 2]
+            - env.scene[sensor.name].data.ray_hits_w[..., 2].mean(dim=-1)
+            for sensor in [sensor_cfg1, sensor_cfg2]
+            if sensor is not None
+        ],
+        dim=-1,
+    )
+    feet_height = torch.clamp(feet_height - foot_height, min=0.0, max=1.0)
+    feet_height = torch.nan_to_num(feet_height, nan=1.0, posinf=1.0, neginf=0)
+    # Compute single_stance mask
+    single_stance = contacts.sum(dim=1) == 1
+    # feet height should be closed to target feet height at the peak
+    rew_pos = feet_height > threshold
+    reward = torch.where(torch.logical_and(~contacts, single_stance.unsqueeze(-1)), rew_pos.float(), 0.0).sum(dim=1)
+    reward *= (
+        torch.norm(env.command_manager.get_command("base_velocity")[:, :2], dim=1)
+        + torch.abs(env.command_manager.get_command("base_velocity")[:, 2])
+    ) > 0.01
+    reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
+    return reward
