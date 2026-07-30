@@ -1,7 +1,7 @@
 """RP_wd sim2sim: Isaac Lab 策略 → MuJoCo 部署"""
 
+import argparse
 import torch
-import torch.nn as nn
 import mujoco
 import mujoco.viewer
 import time
@@ -66,27 +66,31 @@ ACTIONS_SCALE = torch.tensor([
     5.0, 5.0, 5.0, 5.0,           # FOOT (velocity)
 ], device=device, dtype=torch.float32)
 
-# ── 观测归一化 (从 checkpoint 加载) ──────────────────────────────────
-obs_mean = torch.zeros(159, device=device)
-obs_std = torch.ones(159, device=device)
-
+# def world2self(quat, v):
+#     """将世界坐标系向量旋转到机体坐标系.
+#     quat: [qw, qx, qy, qz] (Isaac Lab/MuJoCo 均为 wxyz 标量在前)
+#     v: [x, y, z]
+#     公式: v' = q* ⊗ v ⊗ q (逆旋转), 展开:
+#     v' = v*(2qw²-1) - 2qw*(q_vec×v) + 2(q_vec·v)*q_vec
+#     即: a - b + c (其中 a=标量项, b=叉乘项, c=点乘项)
+#     """
+#     q_w = quat[0]
+#     q_vec = quat[1:]
+#     v_vec = v.to(device=device, dtype=torch.float32)
+#     a = v_vec * (2.0 * q_w ** 2 - 1.0)
+#     b = torch.linalg.cross(q_vec, v_vec) * q_w * 2.0
+#     c = q_vec * torch.dot(q_vec, v_vec) * 2.0
+#     return a - b + c
 
 def world2self(quat, v):
-    """将世界坐标系向量旋转到机体坐标系.
-    quat: [qw, qx, qy, qz] (Isaac Lab/MuJoCo 均为 wxyz 标量在前)
-    v: [x, y, z]
-    公式: v' = q* ⊗ v ⊗ q (逆旋转), 展开:
-    v' = v*(2qw²-1) - 2qw*(q_vec×v) + 2(q_vec·v)*q_vec
-    即: a - b + c (其中 a=标量项, b=叉乘项, c=点乘项)
-    """
-    q_w = quat[0]
-    q_vec = quat[1:]
-    v_vec = v.to(device=device, dtype=torch.float32)
-    a = v_vec * (2.0 * q_w ** 2 - 1.0)
+    q_w = quat[0] 
+    q_vec = quat[1:] 
+    v_vec = torch.tensor(v, device=device, dtype=torch.float32)
+    a = v_vec * (2.0 * q_w**2 - 1.0)
     b = torch.linalg.cross(q_vec, v_vec) * q_w * 2.0
     c = q_vec * torch.dot(q_vec, v_vec) * 2.0
-    return a - b + c
-
+    result = a - b + c
+    return result.to(device)
 
 def get_single_obs(actions, commands=(0.0, 0.0, 0.0)):
     """构建单帧观测 (53维)，不含历史堆叠。"""
@@ -150,54 +154,83 @@ def build_history_obs(history):
     for start, end in term_slices:
         for h in history:
             parts.append(h[start:end])
-    obs = torch.cat(parts)
-
-    obs = (obs - obs_mean) / obs_std.clamp(min=1e-6)
-    return obs
+    return torch.cat(parts)
 
 
-def load_policy(ckpt_path):
-    """从 RSL-RL checkpoint 中提取 actor 网络。"""
-    global obs_mean, obs_std
+# ═══════════════════════════════════════════════════════════════════════
+# 游戏手柄输入设备
+# ═══════════════════════════════════════════════════════════════════════
 
-    checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
-    state_dict = checkpoint["model_state_dict"]
+class GamepadSimple:
+    """直接读取 Linux /dev/input/jsX 设备文件，输出 SE(2) 速度指令。
 
-    # 提取 actor 权重 (去除 "actor." 前缀)
-    actor_state = {}
-    for k, v in state_dict.items():
-        if k.startswith("actor."):
-            actor_state[k[len("actor."):]] = v
+    绕过 Omniverse 的手柄接口，直接从内核驱动层读取。
+    """
 
-    # 提取观测归一化参数 (RSL-RL key: actor_obs_normalizer._mean/_std)
-    if "actor_obs_normalizer._mean" in state_dict:
-        obs_mean = state_dict["actor_obs_normalizer._mean"].squeeze(0).to(device)
-        obs_std = state_dict["actor_obs_normalizer._std"].squeeze(0).to(device)
-        print(f"已加载观测归一化参数 (mean shape={obs_mean.shape})")
+    def __init__(self, vx=1.0, vy=1.0, wz=2.0, dead_zone=0.1, dev="/dev/input/js0"):
+        self._vx = vx
+        self._vy = vy
+        self._wz = wz
+        self._dead_zone = dead_zone
+        self._fd = os.open(dev, os.O_RDONLY | os.O_NONBLOCK)
+        self._axes = [0.0] * 8
+        self._buttons = [0] * 16
+        print(f"手柄已连接: {dev}")
 
-    # 构建网络: 159 → 512 → 256 → 128 → 16
-    actor = nn.Sequential(
-        nn.Linear(159, 512),
-        nn.ELU(alpha=1.0),
-        nn.Linear(512, 256),
-        nn.ELU(alpha=1.0),
-        nn.Linear(256, 128),
-        nn.ELU(alpha=1.0),
-        nn.Linear(128, 16),
-    ).to(device)
+    def _poll(self):
+        """非阻塞读取手柄事件，更新轴和按键状态。"""
+        import struct
+        try:
+            while True:
+                data = os.read(self._fd, 8)
+                if not data:
+                    break
+                _time, value, ev_type, number = struct.unpack('IhBB', data)
+                ev_type &= 0x7f
+                if ev_type == 2:                          # 轴事件
+                    self._axes[number] = value / 32767.0  # 归一化到 [-1, 1]
+                elif ev_type == 1:                        # 按键事件
+                    self._buttons[number] = value
+        except BlockingIOError:
+            pass
 
-    actor.load_state_dict(actor_state)
-    actor.eval()
-    return actor
+    def advance(self) -> tuple:
+        """每帧调用，返回 (vx, vy, wz) 速度指令。"""
+        self._poll()
+        cmd = [0.0, 0.0, 0.0]
+        ly = self._axes[1]    # 左摇杆 Y 轴 (向上为负)
+        lx = self._axes[0]    # 左摇杆 X 轴
+        rx = self._axes[3]    # 右摇杆 X 轴（转向）
+        if abs(ly) > self._dead_zone:
+            cmd[0] = -ly * self._vx
+        if abs(lx) > self._dead_zone:
+            cmd[1] = -lx * self._vy
+        if abs(rx) > self._dead_zone:
+            cmd[2] = -rx * self._wz
+        return tuple(cmd)
 
 
 def main():
     from collections import deque
 
-    # ── 加载策略 ──────────────────────────────────────────────────
-    ckpt_path = "/home/rp/model_server/model_1000.pt"
+    parser = argparse.ArgumentParser(description="Isaac Lab→MuJoCo sim2sim 部署")
+    parser.add_argument("--ckpt", type=str, default="/home/rp/dog/Dog/logs/rsl_rl/RP_wd_walk_flat/2026-07-28_11-53-33/exported/policy.pt",
+                        help="TorchScript 策略路径 (由 play.py 自动导出到 exported/policy.pt)")
+    parser.add_argument("--input", type=str, default="keyboard", choices=["keyboard", "gamepad"],
+                        help="输入设备: keyboard (零指令站立) 或 gamepad")
+    parser.add_argument("--device", type=str, default="/dev/input/js0",
+                        help="手柄设备路径")
+    parser.add_argument("--vx", type=float, default=1.0, help="前进灵敏度")
+    parser.add_argument("--vy", type=float, default=1.0, help="横移灵敏度")
+    parser.add_argument("--wz", type=float, default=1.0, help="转向灵敏度")
+    args = parser.parse_args()
+
+    # ── 加载策略 (TorchScript 模型，已内置归一化) ─────────────────
+    ckpt_path = args.ckpt
     try:
-        actor = load_policy(ckpt_path)
+        policy = torch.jit.load(ckpt_path)
+        policy.eval()
+        policy.to(device)
         print(f"策略加载成功: {ckpt_path}")
     except Exception as e:
         print(f"策略加载失败: {e}")
@@ -224,6 +257,14 @@ def main():
             d.ctrl[mj_idx] = DEFAULT_DOF_POS[lab_idx].item()
         mujoco.mj_step(m, d)
 
+    # ── 输入设备 ──────────────────────────────────────────────────
+    if args.input == "gamepad":
+        input_device = GamepadSimple(vx=args.vx, vy=args.vy, wz=args.wz, dev=args.device)
+        print("手柄控制: 左摇杆移动, 右摇杆左右转向")
+    else:
+        input_device = None
+        print("键盘模式: 零指令站立 (机器人原地维持平衡)")
+
     actions = torch.zeros(16, device=device, dtype=torch.float32)
     history = deque(maxlen=3)
     print("策略启动")
@@ -232,7 +273,12 @@ def main():
     with mujoco.viewer.launch_passive(m, d) as viewer:
 
         while viewer.is_running():
-            commands = (0.0, 0.0, .0)
+            if input_device is not None:
+                raw = input_device.advance()
+                # 训练约定: +wz=顺时针, 手柄期望: +摇杆=逆时针 → 反转
+                commands = (raw[0], raw[1], -raw[2])
+            else:
+                commands = (0.0, 0.0, 0.0)
 
             single_obs = get_single_obs(actions=actions, commands=commands)
             history.append(single_obs)
@@ -240,7 +286,7 @@ def main():
             obs = torch.clip(obs, -100, 100)
 
             with torch.no_grad():
-                actions = actor(obs)
+                actions = policy(obs.unsqueeze(0)).squeeze(0)
 
             # action → actuator ctrl
             act = actions * ACTIONS_SCALE + DEFAULT_DOF_POS

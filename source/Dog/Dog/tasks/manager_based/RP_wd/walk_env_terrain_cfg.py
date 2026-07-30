@@ -134,9 +134,6 @@ class TerrainRewardsCfg(RewardsCfg):
     )
 
     # ── 移除/降权：摔倒时需要大动作、高扭矩、瞬时爆发来纠正 ──
-    action_rate_l2 = None                              # 平地 -0.01，移除动作变化惩罚
-    dof_acc_l2 = None                                  # 平地 -2.5e-7，移除加速度惩罚
-    energy = None                                      # 平地 -2e-4，移除能耗惩罚
     dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-3e-6)  # 平地 -1e-5，降3倍
 
 
