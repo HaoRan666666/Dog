@@ -75,10 +75,6 @@ from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
 import isaaclab_tasks  # noqa: F401  注册官方任务
 import Dog.tasks        # noqa: F401  注册自定义任务
 
-import matplotlib
-matplotlib.use("Agg")  # 无头环境，不依赖显示器
-import matplotlib.pyplot as plt
-
 
 # ═══════════════════════════════════════════════════════════════════
 # 四元数工具
@@ -287,7 +283,7 @@ def main():
         if torque_log is not None:
             t = env.unwrapped.scene["robot"].data.applied_torque[0].cpu().numpy()
             c = env.unwrapped.scene["robot"].data.computed_torque[0].cpu().numpy()
-            torque_log.append(t)
+            torque_log.append((t, c))  # (applied, computed)
             if step % 50 == 0:
                 for i, name in enumerate(joint_names):
                     diff = abs(c[i] - t[i])
@@ -310,22 +306,28 @@ def main():
 
     # ── 保存扭矩数据 + 出图 ────────────────────────────────────────
     if torque_log is not None and len(torque_log) > 0:
-        data = np.stack(torque_log, axis=0)       # [N_steps, N_joints]
-        t = np.arange(len(data)) * dt
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        applied = np.stack([x[0] for x in torque_log], axis=0)   # [N, joints]
+        computed = np.stack([x[1] for x in torque_log], axis=0)
+        t = np.arange(len(applied)) * dt
 
         out_dir = os.path.join(_SCRIPT_DIR, f"torque_{args_cli.record_torque}")
         os.makedirs(out_dir, exist_ok=True)
 
-        np.save(os.path.join(out_dir, "data.npy"), data)
-        print(f"扭矩数据已保存: {out_dir}/data.npy  (shape={data.shape})")
+        np.savez(os.path.join(out_dir, "data.npz"), applied=applied, computed=computed, t=t)
+        print(f"扭矩数据已保存: {out_dir}/data.npz  (shape={applied.shape})")
 
         for idx, name in enumerate(joint_names):
             short = name.replace("_joint", "")
             fig, ax = plt.subplots(figsize=(10, 2))
-            ax.plot(t, data[:, idx], linewidth=0.8)
+            ax.plot(t, applied[:, idx], linewidth=0.8, label="applied")
+            ax.plot(t, computed[:, idx], linewidth=0.8, alpha=0.5, linestyle="--", label="computed")
             ax.set_ylabel("Torque (Nm)")
             ax.set_xlabel("Time (s)")
             ax.set_title(short)
+            ax.legend(fontsize=7, loc="upper right")
             ax.grid(True, alpha=0.3)
             fig.tight_layout()
             fig.savefig(os.path.join(out_dir, f"{short}.png"), dpi=150)

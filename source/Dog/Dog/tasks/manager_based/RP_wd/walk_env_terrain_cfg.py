@@ -47,12 +47,11 @@ class TerrainSceneCfg(SceneCfg):
     height_scanner = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         offset=RayCasterCfg.OffsetCfg(
-            pos=(0.3, 0.0, 0.4),               # 前上方，射线斜前方覆盖
-            rot=(0.9537, 0.0, 0.3007, 0.0),    # 绕Y轴前倾35°，射线斜前下方探测
+            pos=(0.0, 0.0, 0.4),               # 基座正上方，射线正下方探测
         ),
         ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
-        debug_vis=False,
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.6, 1.2]),
+        debug_vis=True,
         mesh_prim_paths=["/World/ground"],
     )
 
@@ -77,21 +76,21 @@ class TerrainObservationsCfg(ObservationsCfg):
 
 @configclass
 class TerrainCommandsCfg:
-    """地形环境的指令配置：加入 yaw 控制，提升复杂地形上的转向能力。"""
+    """地形环境的指令配置：取消 yaw 控制，只走直线，避免转弯影响课程升级。"""
 
     base_velocity = mdp.UniformLevelVelocityCommandCfg(
         asset_name="robot",
-        resampling_time_range=(5.0, 5.0),
+        resampling_time_range=(20.0, 20.0),
         rel_standing_envs=0.05,
         rel_heading_envs=1.0,
-        heading_command=True,
+        heading_command=False,
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.8, 0.8), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+            lin_vel_x=(-0.8, 0.8), lin_vel_y=(-0.3, 0.3), ang_vel_z=(0.0, 0.0), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.8, 0.8), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0)
+            lin_vel_x=(-0.8, 0.8), lin_vel_y=(-0.3, 0.3), ang_vel_z=(0.0, 0.0)
         ),
     )
 
@@ -113,7 +112,7 @@ class TerrainRewardsCfg(RewardsCfg):
 
     # ── 降权重：保留基础姿态约束，防止"前倾滑行"作弊 ──
     flat_orientation_l2 = RewTerm(
-        func=mdp.flat_orientation_l2, weight=-1)  # 平地 -2.5
+        func=mdp.flat_orientation_l2, weight=-0.2)  # 平地 -2.5
 
     # ── 降权重：台阶上允许更大关节偏移，但要保留一定约束 ──
     joint_pos = RewTerm(
@@ -129,7 +128,7 @@ class TerrainRewardsCfg(RewardsCfg):
 
     # ── 降权重：台阶需要更大关节行程，放宽极限惩罚 ──
     joint_pos_limits = RewTerm(
-        func=mdp.joint_pos_limits, weight=-2.0,       # 平地 -20.0
+        func=mdp.joint_pos_limits, weight=-10.0,       # 平地 -20.0
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)},
     )
 

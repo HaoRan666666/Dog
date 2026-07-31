@@ -188,7 +188,7 @@ class RewardsCfg:
     )
 
     # -- 姿态约束
-    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-2.5)
+    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-3.5)
 
     # -- 关节约束
     joint_pos_limits = RewTerm(
@@ -299,6 +299,17 @@ class RewardsCfg:
                 "sensor_cfg2": SceneEntityCfg("right_feet_scanner"),
                 "foot_height":0.04,"threshold":0.02})
 
+    feet_distance = RewTerm(
+        func=mdp.body_distance_y,
+        weight=0.1,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names=[".*foot.*roll.*"]), "min": 0.14, "max": 0.4},
+    )
+
+    knee_distance = RewTerm(
+        func=mdp.body_distance_y,
+        weight=0.1,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names=["knee_.*"]), "min": 0.16, "max": 0.3},
+    )
 
 # ── 终止条件 ──────────────────────────────────────────────────────────
 @configclass

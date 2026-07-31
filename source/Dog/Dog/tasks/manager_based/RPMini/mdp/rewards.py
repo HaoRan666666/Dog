@@ -205,3 +205,18 @@ def feet_height(env: BaseEnv, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntity
     ) > 0.01
     reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
     return reward
+
+
+def body_distance_y(
+    env: BaseEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"), min: float = 0.2, max: float = 0.5
+) -> torch.Tensor:
+    assert len(asset_cfg.body_ids) == 2
+    asset: Articulation = env.scene[asset_cfg.name]
+    root_quat_w = asset.data.root_quat_w.unsqueeze(1).expand(-1, 2, -1)
+    root_pos_w = asset.data.root_pos_w.unsqueeze(1).expand(-1, 2, -1)
+    feet_pos_w = asset.data.body_pos_w[:, asset_cfg.body_ids]
+    feet_pos_b = math_utils.quat_apply_inverse(root_quat_w, feet_pos_w - root_pos_w)
+    distance = torch.abs(feet_pos_b[:, 0, 1] - feet_pos_b[:, 1, 1])
+    d_min = torch.clamp(distance - min, -0.5, 0.)
+    d_max = torch.clamp(distance - max, 0, 0.5)
+    return (torch.exp(-torch.abs(d_min) * 100) + torch.exp(-torch.abs(d_max) * 100)) / 2

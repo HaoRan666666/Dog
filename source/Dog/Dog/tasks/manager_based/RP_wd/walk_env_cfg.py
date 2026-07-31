@@ -222,7 +222,7 @@ class RewardsCfg:
         weight=-1,
         params={
                 "command_name": "base_velocity",
-                "command_threshold": 0.1,
+                "command_threshold": 0.05,
                 "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
               },
     ) 
