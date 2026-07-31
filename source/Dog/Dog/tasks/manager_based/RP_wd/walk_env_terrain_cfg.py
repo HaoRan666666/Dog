@@ -82,15 +82,12 @@ class TerrainCommandsCfg:
         asset_name="robot",
         resampling_time_range=(20.0, 20.0),
         rel_standing_envs=0.05,
-        rel_heading_envs=1.0,
+        rel_heading_envs=0.0,
         heading_command=False,
-        heading_control_stiffness=0.5,
+        heading_control_stiffness=0.0,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.8, 0.8), lin_vel_y=(-0.3, 0.3), ang_vel_z=(0.0, 0.0), heading=(-math.pi, math.pi)
-        ),
-        limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.8, 0.8), lin_vel_y=(-0.3, 0.3), ang_vel_z=(0.0, 0.0)
+            lin_vel_x=(-0.4, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0)
         ),
     )
 
