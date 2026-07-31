@@ -62,6 +62,7 @@ RPMini_CFG = ArticulationCfg(
                 "knee_.*_pitch_joint",
                 "body_yaw_joint",
             ],
+            effort_limit=100,
             effort_limit_sim=100,
             velocity_limit_sim=50,
             stiffness={
@@ -84,6 +85,7 @@ RPMini_CFG = ArticulationCfg(
         ),
         "feet": DelayedPDActuatorCfg(
             joint_names_expr=["foot_.*_pitch_joint", "foot_.*_roll_joint"],
+            effort_limit=100,
             effort_limit_sim=100,
             velocity_limit_sim=50,
             stiffness=40.0,
@@ -97,6 +99,7 @@ RPMini_CFG = ArticulationCfg(
                 "shoulder_.*_pitch_joint",
                 "shoulder_.*_roll_joint",
             ],
+            effort_limit=100,
             effort_limit_sim=100,
             velocity_limit_sim=50,
             stiffness=40.0,
@@ -110,6 +113,8 @@ RPMini_CFG = ArticulationCfg(
                 "elbow_.*_pitch_joint",
                 "elbow_.*_yaw_joint",
             ],
+            effort_limit=100,
+            effort_limit_sim=100,
             stiffness={
                 "elbow_.*_pitch_joint": 30.0,
                 "elbow_.*_yaw_joint": 20.0,
@@ -118,7 +123,6 @@ RPMini_CFG = ArticulationCfg(
                 "elbow_.*_pitch_joint": 1.5,
                 "elbow_.*_yaw_joint": 1.0,
             },
-            effort_limit_sim=100,
             velocity_limit_sim=50,
             armature=0.01,
             min_delay=0,

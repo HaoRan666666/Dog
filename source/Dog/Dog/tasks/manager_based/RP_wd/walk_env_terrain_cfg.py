@@ -51,7 +51,7 @@ class TerrainSceneCfg(SceneCfg):
         ),
         ray_alignment="yaw",
         pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.6, 1.2]),
-        debug_vis=True,
+        debug_vis=False,
         mesh_prim_paths=["/World/ground"],
     )
 
@@ -76,21 +76,21 @@ class TerrainObservationsCfg(ObservationsCfg):
 
 @configclass
 class TerrainCommandsCfg:
-    """地形环境的指令配置：取消 yaw 控制，只走直线，避免转弯影响课程升级。"""
+    """地形环境的指令配置：加入 yaw 控制，提升复杂地形上的转向能力。"""
 
     base_velocity = mdp.UniformLevelVelocityCommandCfg(
         asset_name="robot",
-        resampling_time_range=(20.0, 20.0),
+        resampling_time_range=(8.0, 8.0),
         rel_standing_envs=0.05,
-        rel_heading_envs=0.0,
-        heading_command=False,
-        heading_control_stiffness=0.0,
+        rel_heading_envs=1.0,
+        heading_command=True,
+        heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.4, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0)
+            lin_vel_x=(-0.4, 0.6), lin_vel_y=(-0.3, 0.5), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.4, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0)
+            lin_vel_x=(-0.4, 0.6), lin_vel_y=(-0.3, 0.5), ang_vel_z=(-1.0, 1.0)
         ),
     )
 
@@ -117,7 +117,7 @@ class TerrainRewardsCfg(RewardsCfg):
     # ── 降权重：台阶上允许更大关节偏移，但要保留一定约束 ──
     joint_pos = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.02,
+        weight=-0.1,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
             "stand_still_scale": 5.0,
@@ -133,7 +133,7 @@ class TerrainRewardsCfg(RewardsCfg):
     )
 
     # ── 移除/降权：摔倒时需要大动作、高扭矩、瞬时爆发来纠正 ──
-    dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-3e-6)  # 平地 -1e-5，降3倍
+    # dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-3e-6)  # 平地 -1e-5，降3倍
 
 
 @configclass
@@ -142,12 +142,12 @@ class RP_wd_Walk_Terrain_Env(RP_wd_Walk_Flat_Env):
     scene: TerrainSceneCfg = TerrainSceneCfg(num_envs=2048, env_spacing=4.0)
     observations: TerrainObservationsCfg = TerrainObservationsCfg()
     commands: TerrainCommandsCfg = TerrainCommandsCfg()
-    curriculum = TerrainCurriculumCfg()
+    curriculum = TerrainCurriculumCfg()                                                                     
     rewards: TerrainRewardsCfg = TerrainRewardsCfg()
 
     def __post_init__(self) -> None:
         self.decimation = 8
-        self.episode_length_s = 20
+        self.episode_length_s = 8
         self.viewer.eye = (8.0, 0.0, 5.0)
         self.sim.dt = 0.0025
         self.sim.render_interval = self.decimation
@@ -169,7 +169,12 @@ class RP_wd_Walk_Terrain_Env_Play(RP_wd_Walk_Terrain_Env):
         self.observations.policy.enable_corruption = False
 
         # 从中等难度（20级）开始
-        self.scene.terrain.max_init_terrain_level = 25
+        self.scene.terrain.max_init_terrain_level = 15
+        # Play 模式只用倒金字塔（下台阶）
+        self.scene.terrain.terrain_generator.sub_terrains = {
+            k: v for k, v in self.scene.terrain.terrain_generator.sub_terrains.items()
+            if "inv" in k
+        }
 
         self.teleop_devices = DevicesCfg({
             "keyboard": Se2KeyboardCfg(
@@ -180,3 +185,4 @@ class RP_wd_Walk_Terrain_Env_Play(RP_wd_Walk_Terrain_Env):
         })
 
         self.curriculum = None
+        self.terminations.base_contact = None  # 台阶上 base 易蹭台阶，关掉接触终止

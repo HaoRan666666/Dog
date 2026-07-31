@@ -161,30 +161,35 @@ class GamepadSimple:
         self._vx = vx
         self._vy = vy
         self._wz = wz
-        self._dead_zone = dead_zone  # 死区，避免摇杆漂移
-        # 非阻塞模式打开，不阻塞仿真主循环
-        self._fd = os.open(dev, os.O_RDONLY | os.O_NONBLOCK)
-        self._axes = [0.0] * 8       # 轴状态（最多 8 个轴）
-        self._buttons = [0] * 16     # 按键状态
-        print(f"手柄已连接: {dev}")
+        self._dead_zone = dead_zone
+        try:
+            self._fd = os.open(dev, os.O_RDONLY | os.O_NONBLOCK)
+            self._axes = [0.0] * 8
+            self._buttons = [0] * 16
+            self._connected = True
+            print(f"手柄已连接: {dev}")
+        except FileNotFoundError:
+            self._fd = None
+            self._connected = False
+            print(f"未检测到手柄 ({dev})，返回零指令")
 
     def _poll(self):
-        """非阻塞读取手柄事件，更新轴和按键状态。"""
+        if not self._connected:
+            return
         import struct, os
         try:
             while True:
-                data = os.read(self._fd, 8)       # 每个事件 8 字节
+                data = os.read(self._fd, 8)
                 if not data:
                     break
-                # Linux joystick 事件格式: time(I) | value(h) | type(B) | number(B)
                 _time, value, ev_type, number = struct.unpack('IhBB', data)
-                ev_type &= 0x7f                     # 去掉最高位的 init 标记
-                if ev_type == 2:                    # 轴事件
-                    self._axes[number] = value / 32767.0   # 归一化到 [-1, 1]
-                elif ev_type == 1:                  # 按键事件
+                ev_type &= 0x7f
+                if ev_type == 2:
+                    self._axes[number] = value / 32767.0
+                elif ev_type == 1:
                     self._buttons[number] = value
         except BlockingIOError:
-            pass  # 无新事件，跳过
+            pass
 
     def advance(self) -> np.ndarray:
         """每帧调用，返回当前摇杆对应的速度指令。"""
@@ -243,7 +248,11 @@ def main():
     # ── 输入设备选择 ──────────────────────────────────────────────
     if args_cli.input == "gamepad":
         input_device = GamepadSimple(vx=args_cli.vx, vy=args_cli.vy, wz=args_cli.wz)
-        print("手柄控制: 左摇杆移动, 右摇杆左右转向")
+        if input_device._connected:
+            print("手柄控制: 左摇杆移动, 右摇杆左右转向")
+        else:
+            print("手柄未连接，回退到键盘控制")
+            input_device = Se2KeyboardSimple(vx=args_cli.vx, vy=args_cli.vy, wz=args_cli.wz)
     else:
         input_device = Se2KeyboardSimple(vx=args_cli.vx, vy=args_cli.vy, wz=args_cli.wz)
         print("键盘控制: ↑↓←→ 移动, Q/E 转向, Space 停止, Enter 复位")
@@ -274,6 +283,12 @@ def main():
             cmd = cmd.cpu().numpy()
         term.vel_command_b[:] = torch.tensor(cmd, dtype=torch.float32, device=env.unwrapped.device)
 
+        # 每隔 50 步打印指令和实际速度
+        if step % 50 == 0:
+            vel_actual = env.unwrapped.scene["robot"].data.root_lin_vel_b[0].cpu().numpy()
+            print(f"[{step}] cmd(vx={cmd[0]:.2f} vy={cmd[1]:.2f} wz={cmd[2]:.2f})  "
+                  f"actual(vx={vel_actual[0]:.2f} vy={vel_actual[1]:.2f} wz={vel_actual[2]:.2f})")
+
         # 2) 策略推理 + 环境步进
         with torch.inference_mode():
             actions = policy(obs)
@@ -290,14 +305,14 @@ def main():
                     if diff > 1.0:
                         print(f"[clip] {name}: computed={c[i]:.1f} → applied={t[i]:.1f}  diff={diff:.1f}")
 
-        # 3) 翻倒自动复位
-        base_height = env.unwrapped.scene["robot"].data.root_pos_w[0, 2].item()
-        if base_height < 0.15:
+        # 3) 翻倒自动复位（用姿态判断，不用高度，避免下坡地形误判）
+        grav_z = env.unwrapped.scene["robot"].data.projected_gravity_b[0, 2].item()
+        if grav_z > -0.3:  # 正常站立约 -1.0，翻了约 0~+1.0
             with torch.inference_mode():
                 env.unwrapped.reset()
             obs = env.get_observations()
             term.vel_command_b[:] = 0.0
-            print("Robot flipped, auto-reset.")
+            print(f"Robot flipped, auto-reset. (grav_z={grav_z:.2f})")
 
         # 4) 控制频率对齐
         elapsed = time.time() - start
@@ -316,19 +331,20 @@ def main():
         out_dir = os.path.join(_SCRIPT_DIR, f"torque_{args_cli.record_torque}")
         os.makedirs(out_dir, exist_ok=True)
 
-        np.savez(os.path.join(out_dir, "data.npz"), applied=applied, computed=computed, t=t)
+        np.savez(os.path.join(out_dir, "data.npz"), applied=applied, computed=computed, t=t,
+                 joint_names=np.array(joint_names))
         print(f"扭矩数据已保存: {out_dir}/data.npz  (shape={applied.shape})")
 
+        import matplotlib.ticker as ticker
         for idx, name in enumerate(joint_names):
             short = name.replace("_joint", "")
             fig, ax = plt.subplots(figsize=(10, 2))
-            ax.plot(t, applied[:, idx], linewidth=0.8, label="applied")
-            ax.plot(t, computed[:, idx], linewidth=0.8, alpha=0.5, linestyle="--", label="computed")
+            ax.plot(t, applied[:, idx], linewidth=0.8, linestyle="-")
             ax.set_ylabel("Torque (Nm)")
             ax.set_xlabel("Time (s)")
             ax.set_title(short)
-            ax.legend(fontsize=7, loc="upper right")
-            ax.grid(True, alpha=0.3)
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=8, integer=False))
+            ax.grid(True, alpha=0.3, which="both", linestyle=":")
             fig.tight_layout()
             fig.savefig(os.path.join(out_dir, f"{short}.png"), dpi=150)
             plt.close(fig)

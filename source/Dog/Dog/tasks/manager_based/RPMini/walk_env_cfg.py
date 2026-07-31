@@ -235,7 +235,7 @@ class RewardsCfg:
     )
     joint_deviation_legs = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.01,
+        weight=-0.03,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[
                 "thigh_left_pitch_joint", "thigh_right_pitch_joint",
@@ -274,15 +274,15 @@ class RewardsCfg:
         },
     )
 
-    feet_force = RewTerm(
-        func=mdp.body_force,
-        weight=-3e-3,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*foot.*roll.*"),
-            "threshold": 500,
-            "max_reward": 400,
-        },
-    )
+    # feet_force = RewTerm(
+    #     func=mdp.body_force,
+    #     weight=-3e-3,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*foot.*roll.*"),
+    #         "threshold": 500,
+    #         "max_reward": 400,
+    #     },
+    # )
 
     feet_orientation_l2 = RewTerm(
         func=mdp.body_orientation_l2,
@@ -302,14 +302,14 @@ class RewardsCfg:
     feet_distance = RewTerm(
         func=mdp.body_distance_y,
         weight=0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=[".*foot.*roll.*"]), "min": 0.14, "max": 0.4},
+        params={"asset_cfg": SceneEntityCfg("robot", body_names=".*foot.*roll.*"), "min": 0.14, "max": 0.4},
     )
 
-    knee_distance = RewTerm(
-        func=mdp.body_distance_y,
-        weight=0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=["knee_.*"]), "min": 0.16, "max": 0.3},
-    )
+    # knee_distance = RewTerm(
+    #     func=mdp.body_distance_y,
+    #     weight=0.1,
+    #     params={"asset_cfg": SceneEntityCfg("robot", body_names=[".*knee.*pitch.*"]), "min": 0.16, "max": 0.3},
+    # )
 
 # ── 终止条件 ──────────────────────────────────────────────────────────
 @configclass

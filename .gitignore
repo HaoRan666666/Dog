@@ -63,3 +63,7 @@ tests/
 
 # Docker history
 .isaac-lab-docker-history
+
+#采集数据
+*.png
+*.npz
