@@ -115,26 +115,25 @@ class TerrainRewardsCfg(RewardsCfg):
         func=mdp.flat_orientation_l2, weight=-0.2)  # 平地 -2.5
 
     # ── 降权重：台阶上允许更大关节偏移，但要保留一定约束 ──
-    joint_pos = RewTerm(
+    joint_pos_hip_kenn = RewTerm(
         func=mdp.joint_position_penalty,
         weight=-0.1,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"]),
             "stand_still_scale": 5.0,
             "velocity_threshold": 0.3,
         },
     )
-    # stand_still = None            # 平地 -1.0，静止时惩罚关节偏移
-
-    # ── 降权重：台阶需要更大关节行程，放宽极限惩罚 ──
-    joint_pos_limits = RewTerm(
-        func=mdp.joint_pos_limits, weight=-10.0,       # 平地 -20.0
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)},
+    # ABAD 单独加重惩罚，防止外展抬腿
+    joint_pos_abad = RewTerm(
+        func=mdp.joint_position_penalty,
+        weight=-0.4,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.3,
+        },
     )
-
-    # ── 移除/降权：摔倒时需要大动作、高扭矩、瞬时爆发来纠正 ──
-    # dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-3e-6)  # 平地 -1e-5，降3倍
-
 
 @configclass
 class RP_wd_Walk_Terrain_Env(RP_wd_Walk_Flat_Env):
