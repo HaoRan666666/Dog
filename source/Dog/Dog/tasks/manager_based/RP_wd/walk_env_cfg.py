@@ -116,7 +116,7 @@ class ObservationsCfg:
         def __post_init__(self):
             self.history_length = 3
             self.enable_corruption = True
-            self.concatenate_terms = True
+            self.concatenate_terms = False
 
 
     @configclass
@@ -146,7 +146,7 @@ class ObservationsCfg:
         def __post_init__(self):
             self.history_length = 3
             self.enable_corruption = False
-            self.concatenate_terms = True
+            self.concatenate_terms = False
 
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
