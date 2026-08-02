@@ -87,10 +87,10 @@ class TerrainCommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.4, 0.6), lin_vel_y=(-0.3, 0.5), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.4, 0.6), lin_vel_y=(-0.3, 0.5), ang_vel_z=(-1.0, 1.0)
+            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1.0, 1.0)
         ),
     )
 
@@ -105,10 +105,6 @@ class TerrainCurriculumCfg(CurriculumCfg):
 @configclass
 class TerrainRewardsCfg(RewardsCfg):
     """地形奖励：移除不利于爬坡/上台阶的惩罚项。"""
-
-    # ── 移除：上台阶必须有竖直速度和竖直速度 ──
-    lin_vel_z_l2 = None           # 平地 -0.15，台阶上 z 速度不可避免
-    ang_vel_xy_l2 = None          # 平地 -0.03
 
     # ── 降权重：保留基础姿态约束，防止"前倾滑行"作弊 ──
     flat_orientation_l2 = RewTerm(

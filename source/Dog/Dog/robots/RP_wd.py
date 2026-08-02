@@ -46,7 +46,7 @@ RP_wd_CFG = ArticulationCfg(
         "LEGS": DelayedPDActuatorCfg(
             joint_names_expr=LEG_JOINTS,
             min_delay=0,
-            max_delay=0,
+            max_delay=2,
             effort_limit=42,
             effort_limit_sim=42,
             velocity_limit=10,
@@ -60,7 +60,7 @@ RP_wd_CFG = ArticulationCfg(
         "WHEELS": DelayedPDActuatorCfg(
             joint_names_expr=WHEEL_JOINTS,
             min_delay=0,
-            max_delay=0,
+            max_delay=2,
             effort_limit=17,
             effort_limit_sim=17,
             velocity_limit=42,

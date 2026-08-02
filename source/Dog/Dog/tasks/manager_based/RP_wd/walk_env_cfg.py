@@ -436,8 +436,8 @@ class EventCfg:#定义训练过程中的一些事件
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "static_friction_range": (0.3, 1.6),
-            "dynamic_friction_range": (0.2, 1.2),
+            "static_friction_range": (0.2, 2.0),
+            "dynamic_friction_range": (0.15, 1.5),
             "restitution_range": (0.0, 0.5),
             "num_buckets": 64,
             "make_consistent": True, 
@@ -449,7 +449,7 @@ class EventCfg:#定义训练过程中的一些事件
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="base_link"),
-            "mass_distribution_params": (-3.0, 3.0),
+            "mass_distribution_params": (-5.0, 5.0),
             "operation": "add",
         },
     )
@@ -472,7 +472,7 @@ class EventCfg:#定义训练过程中的一些事件
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="base_link"),
-            "com_range": {"x": (-0.05, 0.05), "y": (-0.05, 0.05), "z": (-0.03, 0.03)},
+            "com_range": {"x": (-0.08, 0.08), "y": (-0.08, 0.08), "z": (-0.05, 0.05)},
         },
     )
 
@@ -483,47 +483,47 @@ class EventCfg:#定义训练过程中的一些事件
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
-            "stiffness_distribution_params": (0.8, 1.2),
-            "damping_distribution_params": (0.8, 1.2),
+            "stiffness_distribution_params": (0.6, 1.4),
+            "damping_distribution_params": (0.6, 1.4),
             "operation": "scale",
         },
     )
 
     # ── 轮子执行器阻尼随机化 ─────────────────────────────────────────────
-    # 轮子 stiffness=0，只随机阻尼 (80%~120%)，刚度不动
+    # 轮子 stiffness=0，只随机阻尼 (60%~140%)，刚度不动
     scale_wheel_actuator_damping = EventTerm(
         func=mdp.randomize_actuator_gains,
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=WHEEL_JOINTS),
             "stiffness_distribution_params": (1.0, 1.0),   # stiffness=0，不变
-            "damping_distribution_params": (0.8, 1.2),
+            "damping_distribution_params": (0.6, 1.4),
             "operation": "scale",
         },
     )
 
     # ── 腿部关节参数随机化 ────────────────────────────────────────────────
-    # 随机缩放腿部关节电枢惯量 (80%~120%)
+    # 随机缩放腿部关节电枢惯量 (60%~140%)
     scale_leg_joint_parameters = EventTerm(
         func=mdp.randomize_joint_parameters,
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
-            "friction_distribution_params": (1.0, 1.0),   # 摩擦力不随机
-            "armature_distribution_params": (0.8, 1.2),
+            "friction_distribution_params": (0.8, 1.2),
+            "armature_distribution_params": (0.6, 1.4),
             "operation": "scale",
         },
     )
 
     # ── 轮子关节参数随机化 ────────────────────────────────────────────────
-    # 随机缩放轮子关节电枢惯量 (80%~120%)
+    # 随机缩放轮子关节电枢惯量 (60%~140%)
     scale_wheel_joint_parameters = EventTerm(
         func=mdp.randomize_joint_parameters,
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=WHEEL_JOINTS),
             "friction_distribution_params": (1.0, 1.0),
-            "armature_distribution_params": (0.8, 1.2),
+            "armature_distribution_params": (0.6, 1.4),
             "operation": "scale",
         },
     )
@@ -574,8 +574,8 @@ class EventCfg:#定义训练过程中的一些事件
     push_robot = EventTerm(
         func=mdp.push_by_setting_velocity,
         mode="interval",
-        interval_range_s=(5.0, 10.0),
-        params={"velocity_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5),"yaw": (-1.0, 1.0)}},
+        interval_range_s=(3.0, 6.0),
+        params={"velocity_range": {"x": (-1.0, 1.0), "y": (-1.0, 1.0),"yaw": (-2.0, 2.0)}},
     )
 
 # ── 平地步态环境 ──────────────────────────────────────────────────
