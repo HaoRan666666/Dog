@@ -116,7 +116,7 @@ class ObservationsCfg:
         def __post_init__(self):
             self.history_length = 3
             self.enable_corruption = True
-            self.concatenate_terms = False
+            self.concatenate_terms = True
             self.flatten_history_dim = True
 
 
@@ -147,7 +147,7 @@ class ObservationsCfg:
         def __post_init__(self):
             self.history_length = 3
             self.enable_corruption = False
-            self.concatenate_terms = False
+            self.concatenate_terms = True
             self.flatten_history_dim = True
 
     policy: PolicyCfg = PolicyCfg()
