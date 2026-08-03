@@ -57,14 +57,14 @@ class PlatformSceneCfg(SceneCfg):
         debug_vis=False,
     )
 
-    # 高度扫描器：与平地配置一致，确保 critic 观测维度兼容 checkpoint
+    # 高度扫描器：与台阶地形配置一致，确保 critic 观测维度兼容 checkpoint
     height_scanner = RayCasterCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         offset=RayCasterCfg.OffsetCfg(
             pos=(0.0, 0.0, 0.4),
         ),
         ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.6, 1.2]),
         debug_vis=False,
         mesh_prim_paths=["/World/ground"],
     )
