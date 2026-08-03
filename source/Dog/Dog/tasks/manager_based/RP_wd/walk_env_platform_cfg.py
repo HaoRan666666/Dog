@@ -8,6 +8,7 @@ import isaaclab.sim as sim_utils
 from isaaclab.devices import DevicesCfg
 from isaaclab.devices.keyboard import Se2KeyboardCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
@@ -26,6 +27,7 @@ from .walk_env_cfg import (
     ObservationsCfg,
     CurriculumCfg,
     RewardsCfg,
+    EventCfg,
 )
 
 LEG_JOINTS = [".*_ABAD_JOINT", ".*_HIP_JOINT", ".*_KENN_JOINT"]
@@ -41,7 +43,7 @@ class PlatformSceneCfg(SceneCfg):
         prim_path="/World/ground",
         terrain_type="generator",
         terrain_generator=PLATFORM_TERRAINS_CFG,
-        max_init_terrain_level=0,
+        max_init_terrain_level=5,
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
@@ -157,6 +159,28 @@ class PlatformRewardsCfg(RewardsCfg):
     )
 
 
+# ── 平台事件配置 ──────────────────────────────────────────────────────
+@configclass
+class PlatformEventCfg(EventCfg):
+    """平台事件：固定朝向和位置，确保机器人出生在地形格中心、面向前方。"""
+
+    reset_base = EventTerm(
+        func=mdp.reset_root_state_uniform,
+        mode="reset",
+        params={
+            "pose_range": {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (0.0, 0.0)},
+            "velocity_range": {
+                "x": (-0.2, 0.2),
+                "y": (-0.2, 0.2),
+                "z": (-0.2, 0.2),
+                "roll": (-0.2, 0.2),
+                "pitch": (-0.2, 0.2),
+                "yaw": (-0.2, 0.2),
+            },
+        },
+    )
+
+
 # ── 平台环境（训练）───────────────────────────────────────────────────
 @configclass
 class RP_wd_Walk_Platform_Env(RP_wd_Walk_Flat_Env):
@@ -169,6 +193,7 @@ class RP_wd_Walk_Platform_Env(RP_wd_Walk_Flat_Env):
     commands: PlatformCommandsCfg = PlatformCommandsCfg()
     curriculum = PlatformCurriculumCfg()
     rewards: PlatformRewardsCfg = PlatformRewardsCfg()
+    events: PlatformEventCfg = PlatformEventCfg()
 
     def __post_init__(self) -> None:
         self.decimation = 8
@@ -195,8 +220,14 @@ class RP_wd_Walk_Platform_Env_Play(RP_wd_Walk_Platform_Env):
 
         self.observations.policy.enable_corruption = False
 
-        # 从中等难度（5级，约0.55m高箱体）开始
-        self.scene.terrain.max_init_terrain_level = 5
+        # 从低难度开始（避免出生在高台阶上）
+        self.scene.terrain.max_init_terrain_level = 0
+
+        # Play 模式只保留坑洞 + 平地
+        self.scene.terrain.terrain_generator.sub_terrains = {
+            k: v for k, v in self.scene.terrain.terrain_generator.sub_terrains.items()
+            if k in ("platform", "plane")
+        }
 
         self.teleop_devices = DevicesCfg({
             "keyboard": Se2KeyboardCfg(
@@ -207,5 +238,5 @@ class RP_wd_Walk_Platform_Env_Play(RP_wd_Walk_Platform_Env):
         })
 
         self.curriculum = None
-        # 平台攀爬时 base 容易蹭到箱体边缘，关闭 base 接触终止
+        # 关闭 base 接触终止，爬台时容易蹭到平台边缘
         self.terminations.base_contact = None
