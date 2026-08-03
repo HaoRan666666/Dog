@@ -5,7 +5,6 @@ from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
-from isaaclab.sensors import RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
@@ -43,16 +42,6 @@ class TerrainSceneCfg(SceneCfg):
             project_uvw=True,
         ),
         debug_vis=False,
-    )
-    height_scanner = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base_link",
-        offset=RayCasterCfg.OffsetCfg(
-            pos=(0.0, 0.0, 0.4),               # 基座正上方，射线正下方探测
-        ),
-        ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.6, 1.2]),
-        debug_vis=False,
-        mesh_prim_paths=["/World/ground"],
     )
 
 

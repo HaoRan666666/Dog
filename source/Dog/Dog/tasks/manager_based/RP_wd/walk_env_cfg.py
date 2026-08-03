@@ -54,12 +54,12 @@ class SceneCfg(InteractiveSceneCfg):
    )
    robot = RP_wd_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
    height_scanner = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base_link",#{ENV_REGEX_NS}这是一个特殊变量，会在场景创建期间被替换为环境名称。 会展开为 /World/envs/env_0 等自动为每个 env 放置一个扫描器
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),#把扫描器 向上抬起 20 米→ 向下发射射线检测地形高度
-        ray_alignment="yaw",#光线模式随着机器人 yaw 旋转（不随 pitch/roll 变化）
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
+        prim_path="{ENV_REGEX_NS}/Robot/base_link",
+        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 0.4)),
+        ray_alignment="yaw",
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.6, 1.2]),
         debug_vis=False,
-        mesh_prim_paths=["/World/ground"],#光线只检测地形，而不是机器人身体。
+        mesh_prim_paths=["/World/ground"],
     )
    contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
    sky_light = AssetBaseCfg(

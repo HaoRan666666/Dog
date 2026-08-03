@@ -12,7 +12,6 @@ from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
-from isaaclab.sensors import RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
@@ -55,18 +54,6 @@ class PlatformSceneCfg(SceneCfg):
             project_uvw=True,
         ),
         debug_vis=False,
-    )
-
-    # 高度扫描器：与台阶地形配置一致，确保 critic 观测维度兼容 checkpoint
-    height_scanner = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base_link",
-        offset=RayCasterCfg.OffsetCfg(
-            pos=(0.0, 0.0, 0.4),
-        ),
-        ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.6, 1.2]),
-        debug_vis=False,
-        mesh_prim_paths=["/World/ground"],
     )
 
 
