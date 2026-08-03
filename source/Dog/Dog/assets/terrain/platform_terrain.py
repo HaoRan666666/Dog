@@ -13,7 +13,7 @@ from isaaclab.terrains.terrain_generator_cfg import TerrainGeneratorCfg
 
 PLATFORM_TERRAINS_CFG = TerrainGeneratorCfg(
     size=(8.0, 8.0),
-    border_width=20.0,
+    border_width=30.0,
     num_rows=20,
     num_cols=10,
     horizontal_scale=0.05,
@@ -26,7 +26,7 @@ PLATFORM_TERRAINS_CFG = TerrainGeneratorCfg(
         # 双层坑：外坑 + 内坑，每层深 0.2m~1.0m（总计 0.4m~2.0m）
         "platform": terrain_gen.MeshPitTerrainCfg(
             proportion=0.8,
-            pit_depth_range=(0.2, 1.0),
+            pit_depth_range=(0.1, 1.0),
             platform_width=1.2,
             double_pit=True,
         ),

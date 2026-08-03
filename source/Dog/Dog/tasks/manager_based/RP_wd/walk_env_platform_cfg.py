@@ -16,7 +16,6 @@ from isaaclab.sensors import RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
-import math
 
 from Dog.assets.terrain.platform_terrain import PLATFORM_TERRAINS_CFG
 
@@ -43,7 +42,7 @@ class PlatformSceneCfg(SceneCfg):
         prim_path="/World/ground",
         terrain_type="generator",
         terrain_generator=PLATFORM_TERRAINS_CFG,
-        max_init_terrain_level=5,
+        max_init_terrain_level=0,
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
@@ -93,21 +92,21 @@ class PlatformObservationsCfg(ObservationsCfg):
 # ── 平台指令配置 ──────────────────────────────────────────────────────
 @configclass
 class PlatformCommandsCfg:
-    """平台环境的指令：中等速度，注重攀爬能力而非高速奔跑。"""
+    """平台指令：只前进 (vx>0)，禁止横移和旋转。上高台必须正面直行。"""
 
     base_velocity = mdp.UniformLevelVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(8.0, 8.0),
         rel_standing_envs=0.05,
-        rel_heading_envs=1.0,
-        heading_command=True,
+        rel_heading_envs=0.0,         # 关闭朝向指令
+        heading_command=False,
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.3, 0.6), lin_vel_y=(-0.3, 0.3), ang_vel_z=(-1.0, 1.0), heading=(-math.pi, math.pi)
+            lin_vel_x=(0.0, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1.0, 1.0)
+            lin_vel_x=(0.0, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0)
         ),
     )
 
@@ -127,7 +126,7 @@ class PlatformRewardsCfg(RewardsCfg):
 
     # ── 降低姿态约束权重：攀爬时身体需要更大的倾角 ──
     flat_orientation_l2 = RewTerm(
-        func=mdp.flat_orientation_l2, weight=-0.15  # 平地 -2.5, 地形 -0.2
+        func=mdp.flat_orientation_l2, weight=-0.1  # 平地 -2.5, 地形 -0.2
     )
 
     # ── 降低关节位置约束：爬台需要更大关节运动 ──
@@ -154,7 +153,7 @@ class PlatformRewardsCfg(RewardsCfg):
     # ── 降低腿部触地惩罚：爬台时大腿容易蹭到平台边缘 ──
     leg_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-5.0,  # 平地 -10.0
+        weight=-2.0,  # 平地 -10.0
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*HIP_LINK", ".*KENN_LINK"]), "threshold": 1.0},
     )
 
