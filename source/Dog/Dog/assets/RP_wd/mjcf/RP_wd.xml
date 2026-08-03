@@ -48,6 +48,138 @@
 
   <worldbody>
     <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" pos="0 0 -0.5"/>
+    <!-- ===== 10级难度台阶 (并排, 上坡→平台→下坡) ===== -->
+    <!-- y=-9到9: L1(h=0.10)~L10(h=0.28), x=[2.0,7.0], 5步+1m平台+5步 -->
+    <!-- 难度 1: h=0.10m y=-9 总高=0.50m -->
+    <geom name="stair_L1_up1" type="box" size="0.2 0.6 0.0500" pos="2.20 -9 -0.4500" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L1_up2" type="box" size="0.2 0.6 0.1000" pos="2.60 -9 -0.4000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L1_up3" type="box" size="0.2 0.6 0.1500" pos="3.00 -9 -0.3500" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L1_up4" type="box" size="0.2 0.6 0.2000" pos="3.40 -9 -0.3000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L1_up5" type="box" size="0.2 0.6 0.2500" pos="3.80 -9 -0.2500" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L1_plat" type="box" size="0.5 0.6 0.2500" pos="4.50 -9 -0.2500" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L1_down1" type="box" size="0.2 0.6 0.2000" pos="5.20 -9 -0.3000" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L1_down2" type="box" size="0.2 0.6 0.1500" pos="5.60 -9 -0.3500" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L1_down3" type="box" size="0.2 0.6 0.1000" pos="6.00 -9 -0.4000" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L1_down4" type="box" size="0.2 0.6 0.0500" pos="6.40 -9 -0.4500" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L1_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 -9 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 2: h=0.12m y=-7 总高=0.60m -->
+    <geom name="stair_L2_up1" type="box" size="0.2 0.6 0.0600" pos="2.20 -7 -0.4400" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L2_up2" type="box" size="0.2 0.6 0.1200" pos="2.60 -7 -0.3800" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L2_up3" type="box" size="0.2 0.6 0.1800" pos="3.00 -7 -0.3200" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L2_up4" type="box" size="0.2 0.6 0.2400" pos="3.40 -7 -0.2600" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L2_up5" type="box" size="0.2 0.6 0.3000" pos="3.80 -7 -0.2000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L2_plat" type="box" size="0.5 0.6 0.3000" pos="4.50 -7 -0.2000" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L2_down1" type="box" size="0.2 0.6 0.2400" pos="5.20 -7 -0.2600" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L2_down2" type="box" size="0.2 0.6 0.1800" pos="5.60 -7 -0.3200" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L2_down3" type="box" size="0.2 0.6 0.1200" pos="6.00 -7 -0.3800" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L2_down4" type="box" size="0.2 0.6 0.0600" pos="6.40 -7 -0.4400" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L2_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 -7 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 3: h=0.14m y=-5 总高=0.70m -->
+    <geom name="stair_L3_up1" type="box" size="0.2 0.6 0.0700" pos="2.20 -5 -0.4300" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L3_up2" type="box" size="0.2 0.6 0.1400" pos="2.60 -5 -0.3600" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L3_up3" type="box" size="0.2 0.6 0.2100" pos="3.00 -5 -0.2900" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L3_up4" type="box" size="0.2 0.6 0.2800" pos="3.40 -5 -0.2200" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L3_up5" type="box" size="0.2 0.6 0.3500" pos="3.80 -5 -0.1500" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L3_plat" type="box" size="0.5 0.6 0.3500" pos="4.50 -5 -0.1500" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L3_down1" type="box" size="0.2 0.6 0.2800" pos="5.20 -5 -0.2200" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L3_down2" type="box" size="0.2 0.6 0.2100" pos="5.60 -5 -0.2900" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L3_down3" type="box" size="0.2 0.6 0.1400" pos="6.00 -5 -0.3600" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L3_down4" type="box" size="0.2 0.6 0.0700" pos="6.40 -5 -0.4300" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L3_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 -5 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 4: h=0.16m y=-3 总高=0.80m -->
+    <geom name="stair_L4_up1" type="box" size="0.2 0.6 0.0800" pos="2.20 -3 -0.4200" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L4_up2" type="box" size="0.2 0.6 0.1600" pos="2.60 -3 -0.3400" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L4_up3" type="box" size="0.2 0.6 0.2400" pos="3.00 -3 -0.2600" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L4_up4" type="box" size="0.2 0.6 0.3200" pos="3.40 -3 -0.1800" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L4_up5" type="box" size="0.2 0.6 0.4000" pos="3.80 -3 -0.1000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L4_plat" type="box" size="0.5 0.6 0.4000" pos="4.50 -3 -0.1000" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L4_down1" type="box" size="0.2 0.6 0.3200" pos="5.20 -3 -0.1800" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L4_down2" type="box" size="0.2 0.6 0.2400" pos="5.60 -3 -0.2600" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L4_down3" type="box" size="0.2 0.6 0.1600" pos="6.00 -3 -0.3400" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L4_down4" type="box" size="0.2 0.6 0.0800" pos="6.40 -3 -0.4200" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L4_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 -3 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 5: h=0.18m y=-1 总高=0.90m -->
+    <geom name="stair_L5_up1" type="box" size="0.2 0.6 0.0900" pos="2.20 -1 -0.4100" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L5_up2" type="box" size="0.2 0.6 0.1800" pos="2.60 -1 -0.3200" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L5_up3" type="box" size="0.2 0.6 0.2700" pos="3.00 -1 -0.2300" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L5_up4" type="box" size="0.2 0.6 0.3600" pos="3.40 -1 -0.1400" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L5_up5" type="box" size="0.2 0.6 0.4500" pos="3.80 -1 -0.0500" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L5_plat" type="box" size="0.5 0.6 0.4500" pos="4.50 -1 -0.0500" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L5_down1" type="box" size="0.2 0.6 0.3600" pos="5.20 -1 -0.1400" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L5_down2" type="box" size="0.2 0.6 0.2700" pos="5.60 -1 -0.2300" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L5_down3" type="box" size="0.2 0.6 0.1800" pos="6.00 -1 -0.3200" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L5_down4" type="box" size="0.2 0.6 0.0900" pos="6.40 -1 -0.4100" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L5_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 -1 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 6: h=0.20m y=1 总高=1.00m -->
+    <geom name="stair_L6_up1" type="box" size="0.2 0.6 0.1000" pos="2.20 1 -0.4000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L6_up2" type="box" size="0.2 0.6 0.2000" pos="2.60 1 -0.3000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L6_up3" type="box" size="0.2 0.6 0.3000" pos="3.00 1 -0.2000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L6_up4" type="box" size="0.2 0.6 0.4000" pos="3.40 1 -0.1000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L6_up5" type="box" size="0.2 0.6 0.5000" pos="3.80 1 0.0000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L6_plat" type="box" size="0.5 0.6 0.5000" pos="4.50 1 0.0000" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L6_down1" type="box" size="0.2 0.6 0.4000" pos="5.20 1 -0.1000" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L6_down2" type="box" size="0.2 0.6 0.3000" pos="5.60 1 -0.2000" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L6_down3" type="box" size="0.2 0.6 0.2000" pos="6.00 1 -0.3000" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L6_down4" type="box" size="0.2 0.6 0.1000" pos="6.40 1 -0.4000" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L6_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 1 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 7: h=0.22m y=3 总高=1.10m -->
+    <geom name="stair_L7_up1" type="box" size="0.2 0.6 0.1100" pos="2.20 3 -0.3900" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L7_up2" type="box" size="0.2 0.6 0.2200" pos="2.60 3 -0.2800" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L7_up3" type="box" size="0.2 0.6 0.3300" pos="3.00 3 -0.1700" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L7_up4" type="box" size="0.2 0.6 0.4400" pos="3.40 3 -0.0600" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L7_up5" type="box" size="0.2 0.6 0.5500" pos="3.80 3 0.0500" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L7_plat" type="box" size="0.5 0.6 0.5500" pos="4.50 3 0.0500" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L7_down1" type="box" size="0.2 0.6 0.4400" pos="5.20 3 -0.0600" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L7_down2" type="box" size="0.2 0.6 0.3300" pos="5.60 3 -0.1700" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L7_down3" type="box" size="0.2 0.6 0.2200" pos="6.00 3 -0.2800" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L7_down4" type="box" size="0.2 0.6 0.1100" pos="6.40 3 -0.3900" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L7_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 3 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 8: h=0.24m y=5 总高=1.20m -->
+    <geom name="stair_L8_up1" type="box" size="0.2 0.6 0.1200" pos="2.20 5 -0.3800" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L8_up2" type="box" size="0.2 0.6 0.2400" pos="2.60 5 -0.2600" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L8_up3" type="box" size="0.2 0.6 0.3600" pos="3.00 5 -0.1400" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L8_up4" type="box" size="0.2 0.6 0.4800" pos="3.40 5 -0.0200" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L8_up5" type="box" size="0.2 0.6 0.6000" pos="3.80 5 0.1000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L8_plat" type="box" size="0.5 0.6 0.6000" pos="4.50 5 0.1000" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L8_down1" type="box" size="0.2 0.6 0.4800" pos="5.20 5 -0.0200" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L8_down2" type="box" size="0.2 0.6 0.3600" pos="5.60 5 -0.1400" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L8_down3" type="box" size="0.2 0.6 0.2400" pos="6.00 5 -0.2600" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L8_down4" type="box" size="0.2 0.6 0.1200" pos="6.40 5 -0.3800" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L8_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 5 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 9: h=0.26m y=7 总高=1.30m -->
+    <geom name="stair_L9_up1" type="box" size="0.2 0.6 0.1300" pos="2.20 7 -0.3700" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L9_up2" type="box" size="0.2 0.6 0.2600" pos="2.60 7 -0.2400" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L9_up3" type="box" size="0.2 0.6 0.3900" pos="3.00 7 -0.1100" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L9_up4" type="box" size="0.2 0.6 0.5200" pos="3.40 7 0.0200" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L9_up5" type="box" size="0.2 0.6 0.6500" pos="3.80 7 0.1500" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L9_plat" type="box" size="0.5 0.6 0.6500" pos="4.50 7 0.1500" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L9_down1" type="box" size="0.2 0.6 0.5200" pos="5.20 7 0.0200" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L9_down2" type="box" size="0.2 0.6 0.3900" pos="5.60 7 -0.1100" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L9_down3" type="box" size="0.2 0.6 0.2600" pos="6.00 7 -0.2400" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L9_down4" type="box" size="0.2 0.6 0.1300" pos="6.40 7 -0.3700" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L9_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 7 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
+    <!-- 难度 10: h=0.28m y=9 总高=1.40m -->
+    <geom name="stair_L10_up1" type="box" size="0.2 0.6 0.1400" pos="2.20 9 -0.3600" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L10_up2" type="box" size="0.2 0.6 0.2800" pos="2.60 9 -0.2200" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L10_up3" type="box" size="0.2 0.6 0.4200" pos="3.00 9 -0.0800" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L10_up4" type="box" size="0.2 0.6 0.5600" pos="3.40 9 0.0600" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L10_up5" type="box" size="0.2 0.6 0.7000" pos="3.80 9 0.2000" rgba="0.55 0.55 0.55 1"/>
+    <geom name="stair_L10_plat" type="box" size="0.5 0.6 0.7000" pos="4.50 9 0.2000" rgba="0.45 0.45 0.45 1"/>
+    <geom name="stair_L10_down1" type="box" size="0.2 0.6 0.5600" pos="5.20 9 0.0600" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L10_down2" type="box" size="0.2 0.6 0.4200" pos="5.60 9 -0.0800" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L10_down3" type="box" size="0.2 0.6 0.2800" pos="6.00 9 -0.2200" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L10_down4" type="box" size="0.2 0.6 0.1400" pos="6.40 9 -0.3600" rgba="0.50 0.50 0.50 1"/>
+    <geom name="stair_L10_down5" type="box" size="0.2 0.6 0.0100" pos="6.80 9 -0.5000" rgba="0.50 0.50 0.50 1"/>
+
     <light name="spotlight" mode="targetbodycom" target="base_link" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <body name="base_link" pos="0 0 0">
       <freejoint name="root"/>

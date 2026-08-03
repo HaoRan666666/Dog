@@ -119,7 +119,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
     # ── 打印关节顺序 ──────────────────────────────────────────────
-    joint_names = env.unwrapped.scene["robot"].data.body_names
+    joint_names = env.unwrapped.scene["robot"].data.joint_names
     print(f"关节数量: {len(joint_names)}")
     for i, name in enumerate(joint_names):
         print(f"  [{i:2d}] {name}")
