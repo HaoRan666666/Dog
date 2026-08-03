@@ -2,6 +2,8 @@ import math
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import AssetBaseCfg
+from isaaclab.devices import DevicesCfg
+from isaaclab.devices.keyboard import Se2KeyboardCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -441,3 +443,30 @@ class RPMini_Walk_Flat_Env(ManagerBasedRLEnvCfg):
         self.viewer.eye = (8.0, 0.0, 5.0)
         self.sim.dt = 0.0025
         self.sim.render_interval = self.decimation
+
+
+# ── 平地 Play 环境（键盘遥控）────────────────────────────────────────────
+@configclass
+class RPMini_Walk_Flat_Env_Play(RPMini_Walk_Flat_Env):
+
+    def __post_init__(self) -> None:
+        self.scene.num_envs = 1
+        self.scene.env_spacing = 2.5
+
+        self.decimation = 8
+        self.episode_length_s = 40
+        self.viewer.eye = (8.0, 0.0, 5.0)
+        self.sim.dt = 0.0025
+        self.sim.render_interval = self.decimation
+
+        self.observations.policy.enable_corruption = False
+
+        self.teleop_devices = DevicesCfg({
+            "keyboard": Se2KeyboardCfg(
+                v_x_sensitivity=1.0,
+                v_y_sensitivity=1.0,
+                omega_z_sensitivity=2.0,
+            ),
+        })
+
+        self.curriculum = None

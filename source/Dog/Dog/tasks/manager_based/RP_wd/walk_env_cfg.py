@@ -114,10 +114,8 @@ class ObservationsCfg:
         #     clip=(-1.0, 1.0),
         # )
         def __post_init__(self):
-            self.history_length = 3
+            self.history_length = 1
             self.enable_corruption = True
-            self.concatenate_terms = True
-            self.flatten_history_dim = True
 
 
     @configclass
@@ -145,10 +143,8 @@ class ObservationsCfg:
         )
 
         def __post_init__(self):
-            self.history_length = 3
+            self.history_length = 1
             self.enable_corruption = False
-            self.concatenate_terms = True
-            self.flatten_history_dim = True
 
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
