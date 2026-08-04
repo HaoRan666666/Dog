@@ -31,7 +31,6 @@ from .walk_env_cfg import (
 LEG_JOINTS = [".*_ABAD_JOINT", ".*_HIP_JOINT", ".*_KENN_JOINT"]
 WHEEL_JOINTS = [".*_FOOT_JOINT"]
 
-
 # ── 平台场景配置 ──────────────────────────────────────────────────────
 @configclass
 class PlatformSceneCfg(SceneCfg):
@@ -84,14 +83,14 @@ class PlatformCommandsCfg:
     base_velocity = mdp.TerrainSplitVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(8.0, 8.0),
-        rel_standing_envs=0.05,
+        rel_standing_envs=0.001,
         rel_heading_envs=1.0,          # 平地全部开启 heading
         heading_command=True,           # 开启 heading（仅平地生效）
         heading_control_stiffness=0.5,
         debug_vis=True,
         # 坑地形：只前进，无旋转
         pit_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.0, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
+            lin_vel_x=(0.2, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
         ),
         # 平地：全向移动 + 旋转
         plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
@@ -117,7 +116,7 @@ class PlatformRewardsCfg(RewardsCfg):
 
     # ── 降低姿态约束权重：攀爬时身体需要更大的倾角 ──
     flat_orientation_l2 = RewTerm(
-        func=mdp.flat_orientation_l2, weight=-0.05  # 平地 -2.5, 地形 -0.2
+        func=mdp.flat_orientation_l2, weight=-0.1  # 平地 -2.5, 地形 -0.2
     )
 
     # ── 关掉父类的合并项（joint_pos 包含 ABAD+HIP+KENN）──
@@ -144,7 +143,7 @@ class PlatformRewardsCfg(RewardsCfg):
     # ABAD 单独加重惩罚，防止外展抬腿
     joint_pos_abad = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.5,
+        weight=-0.1,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
             "stand_still_scale": 5.0,
@@ -155,12 +154,12 @@ class PlatformRewardsCfg(RewardsCfg):
     # ── 加重 base 触地惩罚：爬坑时更不容忍翻倒 ──
     base_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-40.0,  # 平地 -20.0 → 翻倍
+        weight=-50.0,  # 平地 -20.0 → 翻倍
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]), "threshold": 5.0},
     )
     # ── 放宽关节限位惩罚：爬坑需要更大的关节运动范围 ──
     joint_pos_limits = RewTerm(
-        func=mdp.joint_pos_limits, weight=-10.0,  # 平地 -20.0
+        func=mdp.joint_pos_limits, weight=-5.0,  # 平地 -20.0
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)}
     )
     # ── 降低腿部触地惩罚：爬台时大腿容易蹭到平台边缘 ──

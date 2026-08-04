@@ -307,7 +307,7 @@ def main():
 
         # 3) 翻倒自动复位（用姿态判断，不用高度，避免下坡地形误判）
         grav_z = env.unwrapped.scene["robot"].data.projected_gravity_b[0, 2].item()
-        if grav_z > -0.3:  # 正常站立约 -1.0，翻了约 0~+1.0
+        if grav_z > 0:  # 正常站立约 -1.0，爬坡允许前倾，翻了约 0~+1.0
             with torch.inference_mode():
                 env.unwrapped.reset()
             obs = env.get_observations()

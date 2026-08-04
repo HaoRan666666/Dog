@@ -1,34 +1,25 @@
 from __future__ import annotations
 
-from dataclasses import MISSING
+from dataclasses import MISSING, field
 from typing import Sequence
 
 import torch
 
+import isaaclab.utils.math as math_utils
 from isaaclab.envs.mdp import UniformVelocityCommand, UniformVelocityCommandCfg
 from isaaclab.utils import configclass
+
+
+def _default_ranges():
+    """Dummy ranges to satisfy parent validation; never used at runtime."""
+    return UniformVelocityCommandCfg.Ranges(
+        lin_vel_x=(0.0, 1.0), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
+    )
 
 
 @configclass
 class UniformLevelVelocityCommandCfg(UniformVelocityCommandCfg):
     limit_ranges: UniformVelocityCommandCfg.Ranges = MISSING
-
-
-@configclass
-class TerrainSplitVelocityCommandCfg(UniformVelocityCommandCfg):
-    """Two-range velocity command: pit terrains get forward-only, plane terrains get omnidirectional."""
-
-    pit_ranges: UniformVelocityCommandCfg.Ranges = MISSING
-    """Velocity ranges for pit terrain environments."""
-
-    plane_ranges: UniformVelocityCommandCfg.Ranges = MISSING
-    """Velocity ranges for plane terrain environments."""
-
-    pit_col_threshold: int = MISSING
-    """Terrain columns 0..threshold-1 are pits, threshold.. are plane."""
-
-    # 父类要求，实际不使用（_resample_command 已覆写，直接读 pit_ranges / plane_ranges）
-    ranges: UniformVelocityCommandCfg.Ranges = UniformVelocityCommandCfg.Ranges()
 
 
 class TerrainSplitVelocityCommand(UniformVelocityCommand):
@@ -76,3 +67,45 @@ class TerrainSplitVelocityCommand(UniformVelocityCommand):
 
         # standing (shared across both terrain types)
         self.is_standing_env[env_ids] = r.uniform_(0.0, 1.0) <= self.cfg.rel_standing_envs
+
+    def _update_command(self):
+        """Post-processes the velocity command with terrain-aware clipping.
+
+        Overrides the parent to use terrain-specific angular velocity ranges for
+        heading-based control, instead of the dummy ``ranges.ang_vel_z``.
+        """
+        # Compute angular velocity from heading direction (plane envs only)
+        if self.cfg.heading_command:
+            # heading envs are always on plane terrain; pit envs have is_heading_env=False
+            heading_ids = self.is_heading_env.nonzero(as_tuple=False).flatten()
+            if len(heading_ids) > 0:
+                heading_error = math_utils.wrap_to_pi(
+                    self.heading_target[heading_ids] - self.robot.data.heading_w[heading_ids]
+                )
+                self.vel_command_b[heading_ids, 2] = torch.clip(
+                    self.cfg.heading_control_stiffness * heading_error,
+                    min=self.cfg.plane_ranges.ang_vel_z[0],
+                    max=self.cfg.plane_ranges.ang_vel_z[1],
+                )
+        # Enforce standing (zero velocity command) for standing envs
+        standing_env_ids = self.is_standing_env.nonzero(as_tuple=False).flatten()
+        self.vel_command_b[standing_env_ids, :] = 0.0
+
+
+@configclass
+class TerrainSplitVelocityCommandCfg(UniformVelocityCommandCfg):
+    """Two-range velocity command: pit terrains get forward-only, plane terrains get omnidirectional."""
+
+    class_type: type = TerrainSplitVelocityCommand
+
+    pit_ranges: UniformVelocityCommandCfg.Ranges = MISSING
+    """Velocity ranges for pit terrain environments."""
+
+    plane_ranges: UniformVelocityCommandCfg.Ranges = MISSING
+    """Velocity ranges for plane terrain environments."""
+
+    pit_col_threshold: int = MISSING
+    """Terrain columns 0..threshold-1 are pits, threshold.. are plane."""
+
+    # 父类要求，实际不使用（_resample_command 已覆写，直接读 pit_ranges / plane_ranges）
+    ranges: UniformVelocityCommandCfg.Ranges = field(default_factory=_default_ranges)
