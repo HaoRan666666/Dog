@@ -79,22 +79,26 @@ class PlatformObservationsCfg(ObservationsCfg):
 # ── 平台指令配置 ──────────────────────────────────────────────────────
 @configclass
 class PlatformCommandsCfg:
-    """平台指令：只前进 (vx>0)，禁止横移和旋转。上高台必须正面直行。"""
+    """平台指令：坑地形只前进，平地全向移动。根据 env 所处地形类型自动切换。"""
 
-    base_velocity = mdp.UniformLevelVelocityCommandCfg(
+    base_velocity = mdp.TerrainSplitVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(8.0, 8.0),
         rel_standing_envs=0.05,
-        rel_heading_envs=0.0,         # 关闭朝向指令
-        heading_command=False,
+        rel_heading_envs=1.0,          # 平地全部开启 heading
+        heading_command=True,           # 开启 heading（仅平地生效）
         heading_control_stiffness=0.5,
         debug_vis=True,
-        ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
+        # 坑地形：只前进，无旋转
+        pit_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
             lin_vel_x=(0.0, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
         ),
-        limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.0, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0)
+        # 平地：全向移动 + 旋转
+        plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
+            lin_vel_x=(-1.5, 1.5), lin_vel_y=(-1.5, 1.5), ang_vel_z=(-1.0, 1.0), heading=(-3.14, 3.14)
         ),
+        # num_cols=10, platform proportion=0.8 → 前8列是坑, 后2列是平地
+        pit_col_threshold=8,
     )
 
 
@@ -113,15 +117,26 @@ class PlatformRewardsCfg(RewardsCfg):
 
     # ── 降低姿态约束权重：攀爬时身体需要更大的倾角 ──
     flat_orientation_l2 = RewTerm(
-        func=mdp.flat_orientation_l2, weight=-0.1  # 平地 -2.5, 地形 -0.2
+        func=mdp.flat_orientation_l2, weight=-0.05  # 平地 -2.5, 地形 -0.2
     )
 
-    # ── 降低关节位置约束：爬台需要更大关节运动 ──
-    joint_pos_hip_kenn = RewTerm(
+    # ── 关掉父类的合并项（joint_pos 包含 ABAD+HIP+KENN）──
+    joint_pos = None
+    # ── 大腿和小腿分开约束：大腿放宽，小腿保留 ──
+    joint_pos_hip = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.08,
+        weight=-0.01,  # 大腿极轻约束
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"]),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT"]),
+            "stand_still_scale": 5.0,
+            "velocity_threshold": 0.3,
+        },
+    )
+    joint_pos_kenn = RewTerm(
+        func=mdp.joint_position_penalty,
+        weight=-0.03,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_KENN_JOINT"]),
             "stand_still_scale": 5.0,
             "velocity_threshold": 0.3,
         },
@@ -129,7 +144,7 @@ class PlatformRewardsCfg(RewardsCfg):
     # ABAD 单独加重惩罚，防止外展抬腿
     joint_pos_abad = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.3,
+        weight=-0.5,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
             "stand_still_scale": 5.0,
@@ -137,12 +152,25 @@ class PlatformRewardsCfg(RewardsCfg):
         },
     )
 
+    # ── 加重 base 触地惩罚：爬坑时更不容忍翻倒 ──
+    base_contact_penalty = RewTerm(
+        func=mdp.undesired_contacts,
+        weight=-40.0,  # 平地 -20.0 → 翻倍
+        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]), "threshold": 5.0},
+    )
+    # ── 放宽关节限位惩罚：爬坑需要更大的关节运动范围 ──
+    joint_pos_limits = RewTerm(
+        func=mdp.joint_pos_limits, weight=-10.0,  # 平地 -20.0
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)}
+    )
     # ── 降低腿部触地惩罚：爬台时大腿容易蹭到平台边缘 ──
     leg_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-2.0,  # 平地 -10.0
+        weight=-3.0,  # 平地 -10.0
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*HIP_LINK", ".*KENN_LINK"]), "threshold": 1.0},
     )
+    # 关掉轮速惩罚：允许前轮蹭侧壁辅助攀爬
+    wheel_vel_penalty = None
 
 
 # ── 平台事件配置 ──────────────────────────────────────────────────────
@@ -209,10 +237,10 @@ class RP_wd_Walk_Platform_Env_Play(RP_wd_Walk_Platform_Env):
         # 从低难度开始（避免出生在高台阶上）
         self.scene.terrain.max_init_terrain_level = 0
 
-        # Play 模式只保留坑洞 + 平地
+        # Play 模式保留坑洞 + 台阶 + 平地
         self.scene.terrain.terrain_generator.sub_terrains = {
             k: v for k, v in self.scene.terrain.terrain_generator.sub_terrains.items()
-            if k in ("platform", "plane")
+            if k in ("platform", "stairs", "plane")
         }
 
         self.teleop_devices = DevicesCfg({

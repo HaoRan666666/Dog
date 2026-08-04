@@ -23,14 +23,23 @@ PLATFORM_TERRAINS_CFG = TerrainGeneratorCfg(
     difficulty_range=(0.0, 1.0),
     use_cache=False,
     sub_terrains={
-        # 双层坑：外坑 + 内坑，每层深 0.2m~1.0m（总计 0.4m~2.0m）
+        # 双层坑：主要攀爬训练
         "platform": terrain_gen.MeshPitTerrainCfg(
-            proportion=0.8,
+            proportion=0.7,
             pit_depth_range=(0.1, 1.0),
             platform_width=1.2,
             double_pit=True,
         ),
-        # 平地：起步和休息
+        # 上台阶：保留 10% 台阶地形
+        "stairs_": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
+            proportion=0.1,
+            step_height_range=(0.02, 0.35),
+            step_width=0.4,
+            platform_width=1.5,
+            border_width=1.0,
+            holes=False,
+        ),
+        # 平地：全向移动
         "plane": terrain_gen.MeshPlaneTerrainCfg(
             proportion=0.2,
         ),
