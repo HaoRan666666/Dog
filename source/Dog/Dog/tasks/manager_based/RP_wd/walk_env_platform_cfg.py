@@ -112,64 +112,129 @@ class PlatformCurriculumCfg(CurriculumCfg):
 # ── 平台奖励配置 ──────────────────────────────────────────────────────
 @configclass
 class PlatformRewardsCfg(RewardsCfg):
-    """平台环境奖励：保留基础姿态约束，调整爬台相关惩罚权重。"""
+    """平台环境奖励：坑地形保持宽松约束（便于攀爬），平地恢复标准约束（保证全向步态质量）。
 
-    # ── 降低姿态约束权重：攀爬时身体需要更大的倾角 ──
+    通过 ``terrain_split_reward`` 对同一奖励项按地形类型应用不同 scale。
+    """
+
+    # ── 姿态约束：坑 -0.1（允许大倾角），平地 -2.5（与平地环境一致）──
     flat_orientation_l2 = RewTerm(
-        func=mdp.flat_orientation_l2, weight=-0.1  # 平地 -2.5, 地形 -0.2
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.flat_orientation_l2,
+            "pit_scale": -0.1,
+            "plane_scale": -2.5,
+            "base_params": {},
+        },
     )
 
     # ── 关掉父类的合并项（joint_pos 包含 ABAD+HIP+KENN）──
     joint_pos = None
-    # ── 大腿和小腿分开约束：大腿放宽，小腿保留 ──
+    # ── 大腿：坑极轻（0.01），平地与 flat 的 joint_pos=-0.3 分摊，约 -0.1 ──
     joint_pos_hip = RewTerm(
-        func=mdp.joint_position_penalty,
-        weight=-0.01,  # 大腿极轻约束
+        func=mdp.terrain_split_reward,
+        weight=1.0,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT"]),
-            "stand_still_scale": 5.0,
-            "velocity_threshold": 0.3,
+            "base_func": mdp.joint_position_penalty,
+            "pit_scale": -0.01,
+            "plane_scale": -0.1,
+            "base_params": {
+                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT"]),
+                "stand_still_scale": 5.0,
+                "velocity_threshold": 0.3,
+            },
         },
     )
+    # ── 小腿：坑略紧（0.03），平地约 -0.1 ──
     joint_pos_kenn = RewTerm(
-        func=mdp.joint_position_penalty,
-        weight=-0.03,
+        func=mdp.terrain_split_reward,
+        weight=1.0,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_KENN_JOINT"]),
-            "stand_still_scale": 5.0,
-            "velocity_threshold": 0.3,
+            "base_func": mdp.joint_position_penalty,
+            "pit_scale": -0.03,
+            "plane_scale": -0.1,
+            "base_params": {
+                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_KENN_JOINT"]),
+                "stand_still_scale": 5.0,
+                "velocity_threshold": 0.3,
+            },
         },
     )
-    # ABAD 单独加重惩罚，防止外展抬腿
+    # ABAD：坑 -0.05（防止爬坑时过度外展），平地 -0.1（抑制伸腿代偿）
     joint_pos_abad = RewTerm(
-        func=mdp.joint_position_penalty,
-        weight=-0.1,
+        func=mdp.terrain_split_reward,
+        weight=1.0,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
-            "stand_still_scale": 5.0,
-            "velocity_threshold": 0.3,
+            "base_func": mdp.joint_position_penalty,
+            "pit_scale": -0.05,
+            "plane_scale": -0.1,
+            "base_params": {
+                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
+                "stand_still_scale": 5.0,
+                "velocity_threshold": 0.3,
+            },
         },
     )
 
-    # ── 加重 base 触地惩罚：爬坑时更不容忍翻倒 ──
+    # ── base 触地：坑 -50（不容忍翻倒），平地 -20 ──
     base_contact_penalty = RewTerm(
-        func=mdp.undesired_contacts,
-        weight=-50.0,  # 平地 -20.0 → 翻倍
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]), "threshold": 5.0},
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.undesired_contacts,
+            "pit_scale": -50.0,
+            "plane_scale": -20.0,
+            "base_params": {
+                "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]),
+                "threshold": 5.0,
+            },
+        },
     )
-    # ── 放宽关节限位惩罚：爬坑需要更大的关节运动范围 ──
+    # ── 关节限位：坑 -5（允许大范围运动），平地 -20（与平地环境一致）──
     joint_pos_limits = RewTerm(
-        func=mdp.joint_pos_limits, weight=-5.0,  # 平地 -20.0
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)}
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.joint_pos_limits,
+            "pit_scale": -5.0,
+            "plane_scale": -20.0,
+            "base_params": {
+                "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+            },
+        },
     )
-    # ── 降低腿部触地惩罚：爬台时大腿容易蹭到平台边缘 ──
+    # ── 腿部触地：坑 -3（爬台时容易蹭到），平地 -10（标准约束）──
     leg_contact_penalty = RewTerm(
-        func=mdp.undesired_contacts,
-        weight=-3.0,  # 平地 -10.0
-        params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*HIP_LINK", ".*KENN_LINK"]), "threshold": 1.0},
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.undesired_contacts,
+            "pit_scale": -3.0,
+            "plane_scale": -10.0,
+            "base_params": {
+                "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*HIP_LINK", ".*KENN_LINK"]),
+                "threshold": 1.0,
+            },
+        },
     )
-    # 关掉轮速惩罚：允许前轮蹭侧壁辅助攀爬
-    wheel_vel_penalty = None
+    # ── 轮速惩罚：坑=0（允许蹭侧壁），平地=-0.05（引导用轮子而非伸腿横向移动）──
+    wheel_vel_penalty = RewTerm(
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.wheel_vel_penalty,
+            "pit_scale": 0.0,
+            "plane_scale": -0.05,
+            "base_params": {
+                "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*FOOT_LINK"]),
+                "command_name": "base_velocity",
+                "velocity_threshold": 0.3,
+                "command_threshold": 0.06,
+                "asset_cfg": SceneEntityCfg("robot", joint_names=WHEEL_JOINTS),
+            },
+        },
+    )
 
 
 # ── 平台事件配置 ──────────────────────────────────────────────────────

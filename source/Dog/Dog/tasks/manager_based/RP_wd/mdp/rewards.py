@@ -8,6 +8,8 @@ from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING
 
+from collections.abc import Callable
+
 from isaaclab.assets import Articulation
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils.math import wrap_to_pi
@@ -18,6 +20,78 @@ from isaaclab.assets import RigidObject
 import isaaclab.utils.math as math_utils
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
+
+
+def terrain_split_reward(
+    env: ManagerBasedRLEnv,
+    base_func: Callable,
+    pit_scale: float,
+    plane_scale: float,
+    base_params: dict | None = None,
+    pit_col_threshold: int = 8,
+) -> torch.Tensor:
+    """按地形类型分别缩放任意奖励函数。
+
+    坑地形 (pit, 前 N 列) 缩放 ``pit_scale``，
+    平地 (plane, 剩余列) 缩放 ``plane_scale``。
+
+    用法示例::
+
+        # 无额外参数的基础函数
+        RewTerm(
+            func=mdp.terrain_split_reward,
+            weight=1.0,
+            params={
+                "base_func": mdp.flat_orientation_l2,
+                "pit_scale": -0.1,
+                "plane_scale": -2.5,
+                "base_params": {},
+            },
+        )
+
+        # 带额外参数的基础函数
+        RewTerm(
+            func=mdp.terrain_split_reward,
+            weight=1.0,
+            params={
+                "base_func": mdp.wheel_vel_penalty,
+                "pit_scale": 0.0,
+                "plane_scale": -0.05,
+                "base_params": {
+                    "sensor_cfg": SceneEntityCfg(...),
+                    "command_name": "base_velocity",
+                    ...
+                },
+            },
+        )
+
+    Args:
+        env: RL 环境实例。
+        base_func: 基础奖励函数，签名为 ``(env, **base_params) -> (num_envs,)``。
+        pit_scale: 坑地形 env 的缩放系数。
+        plane_scale: 平地 env 的缩放系数。
+        base_params: 透传给 ``base_func`` 的参数字典。
+        pit_col_threshold: 地形列索引 < 该值的视为坑，>= 视为平地。
+
+    Returns:
+        缩放后的奖励张量，形状 ``(num_envs,)``。
+    """
+    if base_params is None:
+        base_params = {}
+    # 手动解析嵌套的 SceneEntityCfg（manager 只会解析顶层的）。
+    # 用 id(value) 作为缓存 key，避免不同 term 的同名 key 互相影响。
+    if not hasattr(terrain_split_reward, "_resolved_ids"):
+        terrain_split_reward._resolved_ids = set()
+    resolved = terrain_split_reward._resolved_ids
+    for value in base_params.values():
+        if isinstance(value, SceneEntityCfg) and id(value) not in resolved:
+            value.resolve(env.scene)
+            resolved.add(id(value))
+    base_reward = base_func(env, **base_params)
+    terrain_types = env.scene.terrain.terrain_types
+    is_pit = terrain_types < pit_col_threshold
+    scales = torch.where(is_pit, pit_scale, plane_scale)
+    return scales * base_reward
 
 
 def joint_pos_target_l2(env: ManagerBasedRLEnv, target: float, asset_cfg: SceneEntityCfg) -> torch.Tensor:
