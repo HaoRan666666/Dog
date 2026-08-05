@@ -90,7 +90,7 @@ class PlatformCommandsCfg:
         debug_vis=True,
         # 坑地形：只前进，无旋转
         pit_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.2, 0.8), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
+            lin_vel_x=(0.2, 0.6), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
         ),
         # 平地：全向移动 + 旋转
         plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
@@ -117,7 +117,10 @@ class PlatformRewardsCfg(RewardsCfg):
     通过 ``terrain_split_reward`` 对同一奖励项按地形类型应用不同 scale。
     """
 
-    # ── 姿态约束：坑 -0.1（允许大倾角），平地 -2.5（与平地环境一致）──
+    # ── 姿态约束 ──
+    # dynamic_gravity_threshold=0.9:
+    #   站直时 projected_gravity_z≈-1 → upright≈1 → plane_scale=-2.5（标准约束）
+    #   爬台倾斜时 upright<0.9 → pit_scale=-0.1（允许大倾角）
     flat_orientation_l2 = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
@@ -126,12 +129,13 @@ class PlatformRewardsCfg(RewardsCfg):
             "pit_scale": -0.1,
             "plane_scale": -2.5,
             "base_params": {},
+            "dynamic_gravity_threshold": 0.9,
         },
     )
 
     # ── 关掉父类的合并项（joint_pos 包含 ABAD+HIP+KENN）──
     joint_pos = None
-    # ── 大腿：坑极轻（0.01），平地与 flat 的 joint_pos=-0.3 分摊，约 -0.1 ──
+    # ── 大腿 ──
     joint_pos_hip = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
@@ -144,9 +148,10 @@ class PlatformRewardsCfg(RewardsCfg):
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
+            "dynamic_gravity_threshold": 0.9,
         },
     )
-    # ── 小腿：坑略紧（0.03），平地约 -0.1 ──
+    # ── 小腿 ──
     joint_pos_kenn = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
@@ -159,9 +164,10 @@ class PlatformRewardsCfg(RewardsCfg):
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
+            "dynamic_gravity_threshold": 0.9,
         },
     )
-    # ABAD：坑 -0.05（防止爬坑时过度外展），平地 -0.1（抑制伸腿代偿）
+    # ── ABAD ──
     joint_pos_abad = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
@@ -174,16 +180,17 @@ class PlatformRewardsCfg(RewardsCfg):
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
+            "dynamic_gravity_threshold": 0.9,
         },
     )
 
-    # ── base 触地：坑 -50（不容忍翻倒），平地 -20 ──
+    # ── base 触地：坑 -10，平地 -20 ──
     base_contact_penalty = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.undesired_contacts,
-            "pit_scale": -50.0,
+            "pit_scale": -5.0,
             "plane_scale": -20.0,
             "base_params": {
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]),
@@ -191,7 +198,7 @@ class PlatformRewardsCfg(RewardsCfg):
             },
         },
     )
-    # ── 关节限位：坑 -5（允许大范围运动），平地 -20（与平地环境一致）──
+    # ── 关节限位 ──
     joint_pos_limits = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
@@ -202,6 +209,7 @@ class PlatformRewardsCfg(RewardsCfg):
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
             },
+            "dynamic_gravity_threshold": 0.9,
         },
     )
     # ── 腿部触地：坑 -3（爬台时容易蹭到），平地 -10（标准约束）──

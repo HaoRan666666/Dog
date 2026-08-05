@@ -29,6 +29,7 @@ def terrain_split_reward(
     plane_scale: float,
     base_params: dict | None = None,
     pit_col_threshold: int = 8,
+    dynamic_gravity_threshold: float | None = None,
 ) -> torch.Tensor:
     """按地形类型分别缩放任意奖励函数。
 
@@ -72,6 +73,11 @@ def terrain_split_reward(
         plane_scale: 平地 env 的缩放系数。
         base_params: 透传给 ``base_func`` 的参数字典。
         pit_col_threshold: 地形列索引 < 该值的视为坑，>= 视为平地。
+        dynamic_gravity_threshold: 若设置，则用 projected_gravity 的
+            z 分量（机体直立度）替代地形列号来判断 pit/plane。
+            机器人站直时 projected_gravity_z ≈ -1 → upright ≈ 1 → plane；
+            爬行/扭曲时 projected_gravity_z 偏小 → upright < threshold → pit。
+            推荐值 0.85~0.95。
 
     Returns:
         缩放后的奖励张量，形状 ``(num_envs,)``。
@@ -79,7 +85,6 @@ def terrain_split_reward(
     if base_params is None:
         base_params = {}
     # 手动解析嵌套的 SceneEntityCfg（manager 只会解析顶层的）。
-    # 用 id(value) 作为缓存 key，避免不同 term 的同名 key 互相影响。
     if not hasattr(terrain_split_reward, "_resolved_ids"):
         terrain_split_reward._resolved_ids = set()
     resolved = terrain_split_reward._resolved_ids
@@ -88,8 +93,16 @@ def terrain_split_reward(
             value.resolve(env.scene)
             resolved.add(id(value))
     base_reward = base_func(env, **base_params)
-    terrain_types = env.scene.terrain.terrain_types
-    is_pit = terrain_types < pit_col_threshold
+
+    if dynamic_gravity_threshold is not None:
+        # 用躯干直立度动态判断: 站直→plane(紧), 倾斜/爬行→pit(松)
+        # projected_gravity_b[:, 2] ∈ [-1, 0], -1=完全直立, 0=水平
+        upright = -env.scene["robot"].data.projected_gravity_b[:, 2]
+        is_pit = upright < dynamic_gravity_threshold
+    else:
+        terrain_types = env.scene.terrain.terrain_types
+        is_pit = terrain_types < pit_col_threshold
+
     scales = torch.where(is_pit, pit_scale, plane_scale)
     return scales * base_reward
 
