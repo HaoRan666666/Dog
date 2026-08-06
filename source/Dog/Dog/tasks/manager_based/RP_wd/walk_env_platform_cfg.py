@@ -133,8 +133,22 @@ class PlatformRewardsCfg(RewardsCfg):
         },
     )
 
-    # ── 关掉父类的合并项（joint_pos 包含 ABAD+HIP+KENN）──
-    joint_pos = None
+    # ── 统一的关节偏离（父类 joint_pos 的地形分权版本）──
+    joint_pos = RewTerm(
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.joint_position_penalty,
+            "pit_scale": 0,
+            "plane_scale": -0.3,
+            "base_params": {
+                "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+                "stand_still_scale": 5.0,
+                "velocity_threshold": 0.3,
+            },
+            "dynamic_gravity_threshold": 0.9,
+        },
+    )
     # ── 大腿 ──
     joint_pos_hip = RewTerm(
         func=mdp.terrain_split_reward,
@@ -142,7 +156,7 @@ class PlatformRewardsCfg(RewardsCfg):
         params={
             "base_func": mdp.joint_position_penalty,
             "pit_scale": -0.01,
-            "plane_scale": -0.1,
+            "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT"]),
                 "stand_still_scale": 5.0,
@@ -158,7 +172,7 @@ class PlatformRewardsCfg(RewardsCfg):
         params={
             "base_func": mdp.joint_position_penalty,
             "pit_scale": -0.03,
-            "plane_scale": -0.1,
+            "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_KENN_JOINT"]),
                 "stand_still_scale": 5.0,
@@ -173,12 +187,12 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.05,
-            "plane_scale": -0.1,
+            "pit_scale": -0.15,
+            "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
                 "stand_still_scale": 5.0,
-                "velocity_threshold": 0.3,
+                "velocity_threshold": 0.1,
             },
             "dynamic_gravity_threshold": 0.9,
         },
@@ -190,7 +204,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.undesired_contacts,
-            "pit_scale": -5.0,
+            "pit_scale": 0,
             "plane_scale": -20.0,
             "base_params": {
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]),
@@ -199,6 +213,7 @@ class PlatformRewardsCfg(RewardsCfg):
         },
     )
     # ── 关节限位 ──
+    # 只限制外展和小腿（大腿放开，爬台需要大幅度前后摆动）
     joint_pos_limits = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
@@ -207,7 +222,7 @@ class PlatformRewardsCfg(RewardsCfg):
             "pit_scale": -5.0,
             "plane_scale": -20.0,
             "base_params": {
-                "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT", ".*_KENN_JOINT"]),
             },
             "dynamic_gravity_threshold": 0.9,
         },
@@ -218,8 +233,8 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.undesired_contacts,
-            "pit_scale": -3.0,
-            "plane_scale": -10.0,
+            "pit_scale": -1.0,
+            "plane_scale": -20.0,
             "base_params": {
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*HIP_LINK", ".*KENN_LINK"]),
                 "threshold": 1.0,
@@ -240,6 +255,24 @@ class PlatformRewardsCfg(RewardsCfg):
                 "velocity_threshold": 0.3,
                 "command_threshold": 0.06,
                 "asset_cfg": SceneEntityCfg("robot", joint_names=WHEEL_JOINTS),
+            },
+        },
+    )
+
+    # ── 前轮离地惩罚：坑上强制前轮贴壁，平地不生效 ──
+    # feet_air_time 本身 reward=(air_time - threshold) * first_contact，
+    # 负的 pit_scale 把 reward 翻转为惩罚 → 前轮离地越久罚越重
+    front_wheel_air = RewTerm(
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.feet_air_time,
+            "pit_scale": -1.5,         # 坑上惩罚前轮离地
+            "plane_scale": 0.0,        # 平地不生效
+            "base_params": {
+                "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["LF_FOOT_LINK", "RF_FOOT_LINK"]),
+                "command_name": "base_velocity",
+                "threshold": 0.2,
             },
         },
     )
