@@ -26,7 +26,7 @@ PLATFORM_TERRAINS_CFG = TerrainGeneratorCfg(
         # 双层坑：主要攀爬训练
         "platform": terrain_gen.MeshPitTerrainCfg(
             proportion=0.7,
-            pit_depth_range=(0.1, 0.6),
+            pit_depth_range=(0.1, 0.8),
             platform_width=1.5,
             double_pit=True,
         ),

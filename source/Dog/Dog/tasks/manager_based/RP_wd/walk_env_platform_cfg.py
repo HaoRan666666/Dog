@@ -283,6 +283,9 @@ class PlatformRewardsCfg(RewardsCfg):
 class PlatformEventCfg(EventCfg):
     """平台事件：固定朝向和位置，确保机器人出生在地形格中心、面向前方。"""
 
+    # 取消推动干扰（爬台时不需要外部扰动）
+    push_robot = None
+
     reset_base = EventTerm(
         func=mdp.reset_root_state_uniform,
         mode="reset",
