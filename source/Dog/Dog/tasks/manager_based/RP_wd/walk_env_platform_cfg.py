@@ -96,8 +96,8 @@ class PlatformCommandsCfg:
         plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
             lin_vel_x=(-1.5, 1.5), lin_vel_y=(-1.5, 1.5), ang_vel_z=(-1.0, 1.0), heading=(-3.14, 3.14)
         ),
-        # num_cols=10, platform proportion=0.8 → 前8列是坑, 后2列是平地
-        pit_col_threshold=8,
+        # num_cols=10, platform proportion=0.7 → 前7列是坑, 后3列是平地
+        pit_col_threshold=7,
     )
 
 
@@ -342,10 +342,10 @@ class RP_wd_Walk_Platform_Env_Play(RP_wd_Walk_Platform_Env):
         # 从低难度开始（避免出生在高台阶上）
         self.scene.terrain.max_init_terrain_level = 0
 
-        # Play 模式保留坑洞 + 台阶 + 平地
+        # Play 模式保留坑洞 + 平地
         self.scene.terrain.terrain_generator.sub_terrains = {
             k: v for k, v in self.scene.terrain.terrain_generator.sub_terrains.items()
-            if k in ("platform", "stairs", "plane")
+            if k in ("platform", "plane")
         }
 
         self.teleop_devices = DevicesCfg({

@@ -30,18 +30,9 @@ PLATFORM_TERRAINS_CFG = TerrainGeneratorCfg(
             platform_width=1.5,
             double_pit=True,
         ),
-        # 上台阶：保留 10% 台阶地形
-        "stairs_": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
-            proportion=0.1,
-            step_height_range=(0.02, 0.35),
-            step_width=0.4,
-            platform_width=1.5,
-            border_width=1.0,
-            holes=False,
-        ),
         # 平地：全向移动
         "plane": terrain_gen.MeshPlaneTerrainCfg(
-            proportion=0.2,
+            proportion=0.3,
         ),
     },
 )
