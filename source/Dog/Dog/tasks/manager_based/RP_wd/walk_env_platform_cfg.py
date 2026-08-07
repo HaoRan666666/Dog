@@ -90,7 +90,7 @@ class PlatformCommandsCfg:
         debug_vis=True,
         # 坑地形：只前进，无旋转
         pit_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.2, 0.6), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
+            lin_vel_x=(0.2, 1.0), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
         ),
         # 平地：全向移动 + 旋转
         plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
@@ -129,7 +129,7 @@ class PlatformRewardsCfg(RewardsCfg):
             "pit_scale": -0.1,
             "plane_scale": -2.5,
             "base_params": {},
-            "dynamic_gravity_threshold": 0.9,
+            "dynamic_gravity_threshold": 0.95,
         },
     )
 
@@ -146,7 +146,7 @@ class PlatformRewardsCfg(RewardsCfg):
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
-            "dynamic_gravity_threshold": 0.9,
+            "dynamic_gravity_threshold": 0.95,
         },
     )
     # ── 大腿 ──
@@ -162,7 +162,7 @@ class PlatformRewardsCfg(RewardsCfg):
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
-            "dynamic_gravity_threshold": 0.9,
+            "dynamic_gravity_threshold": 0.95,
         },
     )
     # ── 小腿 ──
@@ -178,7 +178,7 @@ class PlatformRewardsCfg(RewardsCfg):
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
-            "dynamic_gravity_threshold": 0.9,
+            "dynamic_gravity_threshold": 0.95,
         },
     )
     # ── ABAD ──
@@ -194,7 +194,7 @@ class PlatformRewardsCfg(RewardsCfg):
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.1,
             },
-            "dynamic_gravity_threshold": 0.9,
+            "dynamic_gravity_threshold": 0.95,
         },
     )
 
@@ -219,12 +219,12 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_pos_limits,
-            "pit_scale": -5.0,
+            "pit_scale": -10.0,
             "plane_scale": -20.0,
             "base_params": {
-                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT", ".*_KENN_JOINT"]),
+                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
             },
-            "dynamic_gravity_threshold": 0.9,
+            "dynamic_gravity_threshold": 0.95,
         },
     )
     # ── 腿部触地：坑 -3（爬台时容易蹭到），平地 -10（标准约束）──
@@ -276,6 +276,11 @@ class PlatformRewardsCfg(RewardsCfg):
             },
         },
     )
+
+    # ── 动作平滑：抑制高频抖动 ──
+    # 爬台时关节约束宽松，策略容易学会大幅快速摆腿，
+    # 加强动作变化率和关节加速度惩罚以抑制迁移时的抖动。
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.05)
 
 
 # ── 平台事件配置 ──────────────────────────────────────────────────────
