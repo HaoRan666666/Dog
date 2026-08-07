@@ -283,12 +283,6 @@ def main():
             cmd = cmd.cpu().numpy()
         term.vel_command_b[:] = torch.tensor(cmd, dtype=torch.float32, device=env.unwrapped.device)
 
-        # 每隔 50 步打印指令和实际速度
-        if step % 50 == 0:
-            vel_actual = env.unwrapped.scene["robot"].data.root_lin_vel_b[0].cpu().numpy()
-            print(f"[{step}] cmd(vx={cmd[0]:.2f} vy={cmd[1]:.2f} wz={cmd[2]:.2f})  "
-                  f"actual(vx={vel_actual[0]:.2f} vy={vel_actual[1]:.2f} wz={vel_actual[2]:.2f})")
-
         # 2) 策略推理 + 环境步进
         with torch.inference_mode():
             actions = policy(obs)

@@ -85,7 +85,7 @@ class PlatformCommandsCfg:
 
     base_velocity = mdp.TerrainSplitVelocityCommandCfg(
         asset_name="robot",
-        resampling_time_range=(8.0, 8.0),
+        resampling_time_range=(15.0, 15.0),
         rel_standing_envs=0.001,
         rel_heading_envs=1.0,          # 平地全部开启 heading
         heading_command=True,           # 开启 heading（仅平地生效）
@@ -93,7 +93,7 @@ class PlatformCommandsCfg:
         debug_vis=True,
         # 坑地形：只前进，无旋转
         pit_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.2, 1.0), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
+            lin_vel_x=(0.2, 0.6), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
         ),
         # 平地：全向移动 + 旋转
         plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
@@ -139,7 +139,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.side_tilt_l2,
-            "pit_scale": -4.0,
+            "pit_scale": -10.0,
             "plane_scale": 0,
             "base_params": {},
             "dynamic_gravity_threshold": 0.95,
@@ -232,7 +232,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_pos_limits,
-            "pit_scale": -10.0,
+            "pit_scale": -2.0,
             "plane_scale": -20.0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
@@ -293,7 +293,7 @@ class PlatformRewardsCfg(RewardsCfg):
     # ── 动作平滑：抑制高频抖动 ──
     # 爬台时关节约束宽松，策略容易产生小幅度高频抖动，
     # 加强动作变化率和关节加速度惩罚以抑制迁移时的抖动。
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.05)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.03)
 
 
 # ── 平台终止配置 ──────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ class PlatformEventCfg(EventCfg):
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (0.0, 0.0)},
+            "pose_range": {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (-0.175, 0.175)},
             "velocity_range": {
                 "x": (-0.2, 0.2),
                 "y": (-0.2, 0.2),
@@ -351,7 +351,7 @@ class RP_wd_Walk_Platform_Env(RP_wd_Walk_Flat_Env):
 
     def __post_init__(self) -> None:
         self.decimation = 8
-        self.episode_length_s = 10  # 比地形(8s)稍长，爬台需要更多时间
+        self.episode_length_s = 16  # 比地形(8s)稍长，爬台需要更多时间
         self.viewer.eye = (8.0, 0.0, 5.0)
         self.sim.dt = 0.0025
         self.sim.render_interval = self.decimation
