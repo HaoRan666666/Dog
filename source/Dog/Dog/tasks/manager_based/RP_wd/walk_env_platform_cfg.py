@@ -262,23 +262,23 @@ class PlatformRewardsCfg(RewardsCfg):
     # ── 前轮离地惩罚：坑上强制前轮贴壁，平地不生效 ──
     # feet_air_time 本身 reward=(air_time - threshold) * first_contact，
     # 负的 pit_scale 把 reward 翻转为惩罚 → 前轮离地越久罚越重
-    front_wheel_air = RewTerm(
-        func=mdp.terrain_split_reward,
-        weight=1.0,
-        params={
-            "base_func": mdp.feet_air_time,
-            "pit_scale": -1.5,         # 坑上惩罚前轮离地
-            "plane_scale": 0.0,        # 平地不生效
-            "base_params": {
-                "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["LF_FOOT_LINK", "RF_FOOT_LINK"]),
-                "command_name": "base_velocity",
-                "threshold": 0.2,
-            },
-        },
-    )
+    # front_wheel_air = RewTerm(
+    #     func=mdp.terrain_split_reward,
+    #     weight=1.0,
+    #     params={
+    #         "base_func": mdp.feet_air_time,
+    #         "pit_scale": -1.5,         # 坑上惩罚前轮离地
+    #         "plane_scale": 0.0,        # 平地不生效
+    #         "base_params": {
+    #             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["LF_FOOT_LINK", "RF_FOOT_LINK"]),
+    #             "command_name": "base_velocity",
+    #             "threshold": 0.2,
+    #         },
+    #     },
+    # )
 
     # ── 动作平滑：抑制高频抖动 ──
-    # 爬台时关节约束宽松，策略容易学会大幅快速摆腿，
+    # 爬台时关节约束宽松，策略容易产生小幅度高频抖动，
     # 加强动作变化率和关节加速度惩罚以抑制迁移时的抖动。
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.05)
 
