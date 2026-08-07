@@ -537,3 +537,32 @@ def joint_position_penalty(
     reward = torch.linalg.norm((asset.data.joint_pos[:, asset_cfg.joint_ids] - asset.data.default_joint_pos[:, asset_cfg.joint_ids]), dim=1)
     return torch.where(torch.logical_or(cmd > 0.0, body_vel > velocity_threshold), reward, stand_still_scale * reward)
 
+
+# ── 侧倾奖励/终止 ────────────────────────────────────────────────
+
+def side_tilt_l2(env: "ManagerBasedRLEnv") -> torch.Tensor:
+    """仅惩罚侧倾（roll），不惩罚俯仰（pitch）。
+
+    ``projected_gravity_b[:, 1]`` 是重力在 body Y 的分量，
+    站直/爬台前倾时 ≈0，侧翻越大值越大。
+    """
+    return torch.square(env.scene["robot"].data.projected_gravity_b[:, 1])
+
+# ── 终止条件 ──────────────────────────────────────────────────────
+
+def side_tilt(
+    env: "ManagerBasedRLEnv",
+    limit_angle: float,
+    backward_angle: float,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """机身侧翻或后倒超过阈值则终止，与爬台俯仰角无关。
+
+    - 侧翻：|g_y| > sin(limit_angle)
+    - 后倒：g_x > sin(backward_angle)，即机身向后倾超过 backward_angle
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    g = asset.data.projected_gravity_b
+    side = torch.abs(g[:, 1]) > torch.sin(torch.tensor(limit_angle))
+    backward = g[:, 0] > torch.sin(torch.tensor(backward_angle))
+    return torch.logical_or(side, backward)

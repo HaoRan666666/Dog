@@ -4,6 +4,8 @@
 机器人需要学习攀爬 0.3m~0.8m 高的箱体平台，并通过课程学习逐步增加难度。
 """
 
+import math
+
 import isaaclab.sim as sim_utils
 from isaaclab.devices import DevicesCfg
 from isaaclab.devices.keyboard import Se2KeyboardCfg
@@ -11,6 +13,7 @@ from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
+from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
@@ -118,16 +121,26 @@ class PlatformRewardsCfg(RewardsCfg):
     """
 
     # ── 姿态约束 ──
-    # dynamic_gravity_threshold=0.9:
-    #   站直时 projected_gravity_z≈-1 → upright≈1 → plane_scale=-2.5（标准约束）
-    #   爬台倾斜时 upright<0.9 → pit_scale=-0.1（允许大倾角）
+    # 整体姿态（g_x²+g_y²）：爬台时轻约束，平地标准约束
     flat_orientation_l2 = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.flat_orientation_l2,
-            "pit_scale": -0.1,
+            "pit_scale": 0,
             "plane_scale": -2.5,
+            "base_params": {},
+            "dynamic_gravity_threshold": 0.95,
+        },
+    )
+    # 侧倾专项（g_y²）：爬台时重点防侧翻，平地已由上面覆盖
+    side_tilt_l2 = RewTerm(
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.side_tilt_l2,
+            "pit_scale": -4.0,
+            "plane_scale": 0,
             "base_params": {},
             "dynamic_gravity_threshold": 0.95,
         },
@@ -204,7 +217,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.undesired_contacts,
-            "pit_scale": 0,
+            "pit_scale": -10,
             "plane_scale": -20.0,
             "base_params": {
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]),
@@ -283,6 +296,19 @@ class PlatformRewardsCfg(RewardsCfg):
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.05)
 
 
+# ── 平台终止配置 ──────────────────────────────────────────────────────
+@configclass
+class PlatformTerminationsCfg:
+    """平台终止条件：超时 + 侧翻/后倒（与爬台俯仰角无关）。"""
+
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    # 侧翻 90° + 后倒 20°（给 20° 后倾空间）
+    side_tilt = DoneTerm(
+        func=mdp.side_tilt,
+        params={"limit_angle": math.radians(90.0), "backward_angle": math.radians(20.0)},
+    )
+
+
 # ── 平台事件配置 ──────────────────────────────────────────────────────
 @configclass
 class PlatformEventCfg(EventCfg):
@@ -320,6 +346,7 @@ class RP_wd_Walk_Platform_Env(RP_wd_Walk_Flat_Env):
     commands: PlatformCommandsCfg = PlatformCommandsCfg()
     curriculum = PlatformCurriculumCfg()
     rewards: PlatformRewardsCfg = PlatformRewardsCfg()
+    terminations: PlatformTerminationsCfg = PlatformTerminationsCfg()
     events: PlatformEventCfg = PlatformEventCfg()
 
     def __post_init__(self) -> None:
