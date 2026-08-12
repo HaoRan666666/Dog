@@ -139,7 +139,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.side_tilt_l2,
-            "pit_scale": -10.0,
+            "pit_scale": -8.0,
             "plane_scale": 0,
             "base_params": {},
             "dynamic_gravity_threshold": 0.95,
@@ -321,7 +321,7 @@ class PlatformEventCfg(EventCfg):
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (-0.175, 0.175)},
+            "pose_range": {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (0.0, 0.0)},
             "velocity_range": {
                 "x": (-0.2, 0.2),
                 "y": (-0.2, 0.2),
