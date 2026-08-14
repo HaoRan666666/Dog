@@ -126,7 +126,7 @@ class PlatformRewardsCfg(RewardsCfg):
         params={
             "base_func": mdp.flat_orientation_l2,
             "pit_scale": 0,
-            "plane_scale": -2.5,
+            "plane_scale": -1.5,
             "base_params": {},
             "dynamic_gravity_threshold": 0.95,
         },
@@ -140,7 +140,7 @@ class PlatformRewardsCfg(RewardsCfg):
             "pit_scale": -4.0,
             "plane_scale": 0,
             "base_params": {},
-            "dynamic_gravity_threshold": 0.95,
+            "pit_col_threshold": 7,
         },
     )
 
@@ -221,6 +221,7 @@ class PlatformRewardsCfg(RewardsCfg):
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]),
                 "threshold": 5.0,
             },
+            "pit_col_threshold": 7,
         },
     )
     # ── 关节限位 ──
@@ -250,6 +251,7 @@ class PlatformRewardsCfg(RewardsCfg):
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*HIP_LINK", ".*KENN_LINK"]),
                 "threshold": 1.0,
             },
+            "pit_col_threshold": 7,
         },
     )
     # ── 轮速惩罚：坑=0（允许蹭侧壁），平地=-0.05（引导用轮子而非伸腿横向移动）──
@@ -267,6 +269,7 @@ class PlatformRewardsCfg(RewardsCfg):
                 "command_threshold": 0.06,
                 "asset_cfg": SceneEntityCfg("robot", joint_names=WHEEL_JOINTS),
             },
+            "pit_col_threshold": 7,
         },
     )
 
