@@ -566,3 +566,18 @@ def side_tilt(
     side = torch.abs(g[:, 1]) > torch.sin(torch.tensor(limit_angle))
     backward = g[:, 0] > torch.sin(torch.tensor(backward_angle))
     return torch.logical_or(side, backward)
+
+
+def base_fallen(
+    env: "ManagerBasedRLEnv",
+    threshold: float = 0.0,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """机身翻倒（相对竖直倾斜超过 90°）则终止，方向无关。
+
+    ``g_z = projected_gravity_b[:, 2]``：站立时 ≈ -1，机身越过水平线后变正。
+    ``g_z > threshold`` 统一覆盖侧翻、后倒、四脚朝天，且天然放行爬台时的大幅前倾。
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    g = asset.data.projected_gravity_b
+    return g[:, 2] > threshold

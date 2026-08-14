@@ -4,8 +4,6 @@
 机器人需要学习攀爬 0.3m~0.8m 高的箱体平台，并通过课程学习逐步增加难度。
 """
 
-import math
-
 import isaaclab.sim as sim_utils
 from isaaclab.devices import DevicesCfg
 from isaaclab.devices.keyboard import Se2KeyboardCfg
@@ -85,7 +83,7 @@ class PlatformCommandsCfg:
 
     base_velocity = mdp.TerrainSplitVelocityCommandCfg(
         asset_name="robot",
-        resampling_time_range=(15.0, 15.0),
+        resampling_time_range=(10.0, 10.0),
         rel_standing_envs=0.001,
         rel_heading_envs=1.0,          # 平地全部开启 heading
         heading_command=True,           # 开启 heading（仅平地生效）
@@ -139,7 +137,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.side_tilt_l2,
-            "pit_scale": -8.0,
+            "pit_scale": -2.0,
             "plane_scale": 0,
             "base_params": {},
             "dynamic_gravity_threshold": 0.95,
@@ -168,7 +166,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.01,
+            "pit_scale": 0,
             "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT"]),
@@ -184,7 +182,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.03,
+            "pit_scale": 0,
             "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_KENN_JOINT"]),
@@ -200,7 +198,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.15,
+            "pit_scale": -0.1,
             "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
@@ -217,7 +215,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.undesired_contacts,
-            "pit_scale": -10,
+            "pit_scale": -5.0,
             "plane_scale": -20.0,
             "base_params": {
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]),
@@ -246,7 +244,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.undesired_contacts,
-            "pit_scale": -1.0,
+            "pit_scale": 0,
             "plane_scale": -20.0,
             "base_params": {
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*HIP_LINK", ".*KENN_LINK"]),
@@ -302,11 +300,8 @@ class PlatformTerminationsCfg:
     """平台终止条件：超时 + 侧翻/后倒（与爬台俯仰角无关）。"""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    # 侧翻 90° + 后倒 20°（给 20° 后倾空间）
-    side_tilt = DoneTerm(
-        func=mdp.side_tilt,
-        params={"limit_angle": math.radians(90.0), "backward_angle": math.radians(20.0)},
-    )
+    # 机身翻倒（相对竖直倾斜 > 90°，方向无关：侧翻/后倒/四脚朝天）
+    base_fallen = DoneTerm(func=mdp.base_fallen, params={"threshold": 0.1})
 
 
 # ── 平台事件配置 ──────────────────────────────────────────────────────
@@ -351,7 +346,7 @@ class RP_wd_Walk_Platform_Env(RP_wd_Walk_Flat_Env):
 
     def __post_init__(self) -> None:
         self.decimation = 8
-        self.episode_length_s = 16  # 比地形(8s)稍长，爬台需要更多时间
+        self.episode_length_s = 10  # 比地形(8s)稍长，爬台需要更多时间
         self.viewer.eye = (8.0, 0.0, 5.0)
         self.sim.dt = 0.0025
         self.sim.render_interval = self.decimation
