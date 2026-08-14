@@ -83,7 +83,7 @@ class PlatformCommandsCfg:
 
     base_velocity = mdp.TerrainSplitVelocityCommandCfg(
         asset_name="robot",
-        resampling_time_range=(10.0, 10.0),
+        resampling_time_range=(8.0, 8.0),
         rel_standing_envs=0.001,
         rel_heading_envs=1.0,          # 平地全部开启 heading
         heading_command=True,           # 开启 heading（仅平地生效）
@@ -134,7 +134,7 @@ class PlatformRewardsCfg(RewardsCfg):
     # 侧倾专项（g_y²）：爬台时重点防侧翻，平地已由上面覆盖
     side_tilt_l2 = RewTerm(
         func=mdp.terrain_split_reward,
-        weight=1.0,
+        weight=-4.0,
         params={
             "base_func": mdp.side_tilt_l2,
             "pit_scale": -2.0,
@@ -166,7 +166,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": 0,
+            "pit_scale": -0.01,
             "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT"]),
@@ -182,7 +182,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": 0,
+            "pit_scale": -0.03,
             "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_KENN_JOINT"]),
@@ -198,7 +198,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.1,
+            "pit_scale": -0.15,
             "plane_scale": 0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
@@ -215,7 +215,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.undesired_contacts,
-            "pit_scale": -5.0,
+            "pit_scale": -10.0,
             "plane_scale": -20.0,
             "base_params": {
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base_link"]),
@@ -230,7 +230,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.joint_pos_limits,
-            "pit_scale": -2.0,
+            "pit_scale": -5.0,
             "plane_scale": -20.0,
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
@@ -244,7 +244,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.undesired_contacts,
-            "pit_scale": 0,
+            "pit_scale": -1.0,
             "plane_scale": -20.0,
             "base_params": {
                 "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*HIP_LINK", ".*KENN_LINK"]),
