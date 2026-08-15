@@ -181,9 +181,9 @@ class RewardsCfg:
     # #电机力矩
     dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-1.0e-5,
                              params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
-#     #关节加速度
+#   #关节加速度
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
-#     # #动作变化
+#   #动作变化
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
     energy = RewTerm(func=mdp.energy, weight=-2e-4,
                      params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})

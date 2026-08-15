@@ -40,3 +40,17 @@ class PPORunnerCfg(RslRlOnPolicyRunnerCfg):  # 继承 On-Policy Runner 基类，
         desired_kl=0.01,  # 目标 KL 散度，adaptive schedule 的参照值：KL 过大→降学习率，KL 过小→升学习率
         max_grad_norm=1.0,  # 梯度裁剪的最大范数，防止单步梯度爆炸，超过 1.0 则缩放回 1.0
     )
+
+
+@configclass
+class PPORunnerTerrainCfg(PPORunnerCfg):
+    """台阶（地形）任务的 Runner 配置：与平地共享超参，仅用独立 experiment_name 区分日志目录。"""
+
+    experiment_name = "RP_wd_walk_terrain"
+
+
+@configclass
+class PPORunnerPlatformCfg(PPORunnerCfg):
+    """高台/平台任务的 Runner 配置：与平地共享超参，仅用独立 experiment_name 区分日志目录。"""
+
+    experiment_name = "RP_wd_walk_platform"
