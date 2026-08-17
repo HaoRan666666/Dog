@@ -140,7 +140,7 @@ class PlatformRewardsCfg(RewardsCfg):
             "pit_scale": -4.0,
             "plane_scale": 0,
             "base_params": {},
-            "dynamic_gravity_threshold": 0.95,
+            "pit_col_threshold": 7,
         },
     )
 

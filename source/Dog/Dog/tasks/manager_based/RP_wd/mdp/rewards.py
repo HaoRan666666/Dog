@@ -28,7 +28,7 @@ def terrain_split_reward(
     pit_scale: float,
     plane_scale: float,
     base_params: dict | None = None,
-    pit_col_threshold: int = 8,
+    pit_col_threshold: int = 7,
     dynamic_gravity_threshold: float | None = None,
 ) -> torch.Tensor:
     """按地形类型分别缩放任意奖励函数。
