@@ -126,7 +126,7 @@ class PlatformRewardsCfg(RewardsCfg):
         params={
             "base_func": mdp.flat_orientation_l2,
             "pit_scale": 0,
-            "plane_scale": -1.5,
+            "plane_scale": -2.5,
             "base_params": {},
             "dynamic_gravity_threshold": 0.95,
         },
@@ -140,7 +140,7 @@ class PlatformRewardsCfg(RewardsCfg):
             "pit_scale": -4.0,
             "plane_scale": 0,
             "base_params": {},
-            "pit_col_threshold": 7,
+            "dynamic_gravity_threshold": 0.95,
         },
     )
 
