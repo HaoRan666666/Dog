@@ -128,7 +128,7 @@ class PlatformRewardsCfg(RewardsCfg):
             "pit_scale": 0,
             "plane_scale": -2.5,
             "base_params": {},
-            "dynamic_gravity_threshold": 0.95,
+            "pit_col_threshold": 7,
         },
     )
     # 侧倾专项（g_y²）：爬台时重点防侧翻，平地已由上面覆盖
