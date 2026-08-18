@@ -125,7 +125,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.flat_orientation_l2,
-            "pit_scale": 0,
+            "pit_scale": -1.0,
             "plane_scale": -2.5,
             "base_params": {},
             "pit_col_threshold": 7,
