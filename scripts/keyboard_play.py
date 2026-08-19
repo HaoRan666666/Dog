@@ -3,11 +3,11 @@
 
 用法:
     # 键盘控制
-    python sim2sim/keyboard_play.py --task BPX_Walk_Flat-v0_Play \
+    python scripts/keyboard_play.py --task BPX_Walk_Flat-v0_Play \
         --checkpoint logs/rsl_rl/bpx_walk_flat/xxx/model_9999.pt
 
     # 手柄控制
-    python sim2sim/keyboard_play.py --task BPX_Walk_Flat-v0_Play \
+    python scripts/keyboard_play.py --task BPX_Walk_Flat-v0_Play \
         --checkpoint logs/rsl_rl/bpx_walk_flat/xxx/model_9999.pt --input gamepad
 
 键盘按键:

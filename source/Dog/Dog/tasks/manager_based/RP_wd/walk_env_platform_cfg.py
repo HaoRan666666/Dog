@@ -125,10 +125,10 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.flat_orientation_l2,
-            "pit_scale": -1.0,
+            "pit_scale": -1.5,
             "plane_scale": -2.5,
             "base_params": {},
-            "pit_col_threshold": 7,
+            "dynamic_gravity_threshold": 0.95,
         },
     )
     # 侧倾专项（g_y²）：爬台时重点防侧翻，平地已由上面覆盖
@@ -137,7 +137,7 @@ class PlatformRewardsCfg(RewardsCfg):
         weight=1.0,
         params={
             "base_func": mdp.side_tilt_l2,
-            "pit_scale": -4.0,
+            "pit_scale": -2.5,
             "plane_scale": 0,
             "base_params": {},
             "pit_col_threshold": 7,
