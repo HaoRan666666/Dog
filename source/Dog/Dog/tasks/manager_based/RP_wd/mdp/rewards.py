@@ -107,6 +107,101 @@ def terrain_split_reward(
     return scales * base_reward
 
 
+def is_flat_terrain(
+    env: "ManagerBasedRLEnv",
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("height_scanner"),
+    flatness_threshold: float = 0.05,
+) -> torch.Tensor:
+    """判断脚下地形是否平坦，返回 ``(num_envs,)`` 的 0/1 浮点开关量。
+
+    用 height_scanner 命中点高度的**分位数范围（P95−P5）**衡量平坦度，
+    而非 max-min 这种由单个极值点决定的判据，因此对「少数射线越出台沿」不敏感：
+    - 平坦：中间 90% 命中点高度接近 → 1；
+    - 坡面/90° 墙：命中点高度呈双峰（台面 vs 坑底）→ 0。
+
+    该开关量与机身倾角本身无关（只看脚下地形几何），因此可复用到任意奖励，
+    作为「站平才约束、爬行中放宽」的切换判据。
+    """
+    sensor = env.scene.sensors[sensor_cfg.name]
+    hit_z = sensor.data.ray_hits_w[..., 2]          # [num_envs, num_rays] 地形命中高度
+    p5 = torch.quantile(hit_z, 0.05, dim=1)
+    p95 = torch.quantile(hit_z, 0.95, dim=1)
+    terrain_range = p95 - p5                       # 中间 90% 命中点的垂直跨度
+    return (terrain_range < flatness_threshold).float()
+
+
+def flatness_split_reward(
+    env: "ManagerBasedRLEnv",
+    base_func: Callable,
+    flat_scale: float,
+    nonflat_scale: float = 0.0,
+    base_params: dict | None = None,
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("height_scanner"),
+    flatness_threshold: float = 0.05,
+) -> torch.Tensor:
+    """按脚下地形平坦度切换任意奖励函数。
+
+    平坦（``is_flat_terrain`` 为 1）时缩放 ``flat_scale``，
+    不平坦（爬行/坡面/悬空）时缩放 ``nonflat_scale``。
+
+    用法示例::
+
+        # 站平才罚机身倾斜，爬行中不罚（专治爬上后翘头）
+        RewTerm(
+            func=mdp.flatness_split_reward,
+            weight=1.0,
+            params={
+                "base_func": mdp.flat_orientation_l2,
+                "flat_scale": -2.5,
+                "nonflat_scale": 0.0,
+                "base_params": {},
+            },
+        )
+
+        # 带额外参数的基础函数
+        RewTerm(
+            func=mdp.flatness_split_reward,
+            weight=1.0,
+            params={
+                "base_func": mdp.joint_position_penalty,
+                "flat_scale": -0.03,
+                "nonflat_scale": 0.0,
+                "base_params": {
+                    "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_KENN_JOINT"]),
+                    "stand_still_scale": 5.0,
+                    "velocity_threshold": 0.3,
+                },
+            },
+        )
+
+    Args:
+        env: RL 环境实例。
+        base_func: 基础奖励函数，签名为 ``(env, **base_params) -> (num_envs,)``。
+        flat_scale: 脚下地形平坦时的缩放系数。
+        nonflat_scale: 脚下地形不平坦（爬行/坡面/悬空）时的缩放系数。
+        base_params: 透传给 ``base_func`` 的参数字典。
+        sensor_cfg: height_scanner 传感器配置。
+        flatness_threshold: P95−P5 命中点高度范围 < 该值视为平坦。
+
+    Returns:
+        缩放后的奖励张量，形状 ``(num_envs,)``。
+    """
+    if base_params is None:
+        base_params = {}
+    # 手动解析嵌套的 SceneEntityCfg（manager 只会解析顶层的）。
+    if not hasattr(flatness_split_reward, "_resolved_ids"):
+        flatness_split_reward._resolved_ids = set()
+    resolved = flatness_split_reward._resolved_ids
+    for value in base_params.values():
+        if isinstance(value, SceneEntityCfg) and id(value) not in resolved:
+            value.resolve(env.scene)
+            resolved.add(id(value))
+    base_reward = base_func(env, **base_params)
+    is_flat = is_flat_terrain(env, sensor_cfg, flatness_threshold)
+    scales = torch.where(is_flat.bool(), flat_scale, nonflat_scale)
+    return scales * base_reward
+
+
 def joint_pos_target_l2(env: ManagerBasedRLEnv, target: float, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     """Penalize joint position deviation from a target value."""
     # extract the used quantities (to enable type-hinting)
@@ -547,6 +642,30 @@ def side_tilt_l2(env: "ManagerBasedRLEnv") -> torch.Tensor:
     站直/爬台前倾时 ≈0，侧翻越大值越大。
     """
     return torch.square(env.scene["robot"].data.projected_gravity_b[:, 1])
+
+
+def flat_on_flat_terrain(
+    env: "ManagerBasedRLEnv",
+    sensor_cfg: SceneEntityCfg = SceneEntityCfg("height_scanner"),
+    flatness_threshold: float = 0.05,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """站在平坦地形上（平地/中间台阶/台面）时惩罚机身倾斜，坡面/爬行中返回 0。
+
+    用 height_scanner 命中点高度的**分位数范围（P95−P5）**判断脚下地形是否平坦，
+    而非 max-min 这种由单个极值点决定的判据，因此对「少数射线越出台沿」不敏感：
+    - 平坦：中间 90% 命中点高度接近 → 罚 ``g_x²+g_y²``，把机身拉平；
+    - 坡面/90° 墙：命中点高度呈双峰（台面 vs 坑底）→ 分位范围大 → 0。
+
+    开关量是**地形几何**，与机身倾角本身无关，因此对 double_pit 的每一级台阶
+    （以及最终台面）都生效，且不会像 ``dynamic_gravity_threshold`` 那样把
+    「爬台倾斜」和「翘头」混为一谈。height_scanner 的 ``ray_alignment="yaw"``
+    保证射线始终垂直向下，命中点 z 不受机身俯仰/侧倾影响。
+    """
+    is_flat = is_flat_terrain(env, sensor_cfg, flatness_threshold)
+    asset = env.scene[asset_cfg.name]
+    tilt = torch.sum(torch.square(asset.data.projected_gravity_b[:, :2]), dim=1)
+    return -is_flat * tilt
 
 # ── 终止条件 ──────────────────────────────────────────────────────
 

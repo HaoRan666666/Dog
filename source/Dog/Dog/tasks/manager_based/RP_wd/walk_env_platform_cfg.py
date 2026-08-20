@@ -13,6 +13,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.sensors import RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
@@ -54,6 +55,17 @@ class PlatformSceneCfg(SceneCfg):
             project_uvw=True,
         ),
         debug_vis=False,
+    )
+
+    # 平坦度判据专用小范围扫描：远小于最窄站台（内平台 1.5m），
+    # 避免起步左右晃动时射线越出台沿、把「站平」误判成「爬台」
+    flatness_scanner = RayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base_link",
+        offset=RayCasterCfg.OffsetCfg(pos=(0.1, 0.0, 0.4)),
+        ray_alignment="yaw",
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.0, 0.4]),
+        debug_vis=False,
+        mesh_prim_paths=["/World/ground"],
     )
 
 
@@ -119,93 +131,100 @@ class PlatformRewardsCfg(RewardsCfg):
     """
 
     # ── 姿态约束 ──
-    # 整体姿态（g_x²+g_y²）：爬台时轻约束，平地标准约束
+    # 整体姿态（g_x²+g_y²）：站平（含中间台阶/台面）罚倾斜，爬行/坡面不罚
     flat_orientation_l2 = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.flat_orientation_l2,
-            "pit_scale": -1.5,
-            "plane_scale": -2.5,
+            "flat_scale": -2.5,       # 脚下地形平坦 → 罚倾斜
+            "nonflat_scale": 0.0,     # 爬行/坡面 → 不罚（专治「爬上后一直翘头」）
             "base_params": {},
-            "dynamic_gravity_threshold": 0.95,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,  # P95-P5 命中点高度范围 < 5cm 视为平坦
         },
     )
+    
     # 侧倾专项（g_y²）：爬台时重点防侧翻，平地已由上面覆盖
     side_tilt_l2 = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.side_tilt_l2,
-            "pit_scale": -2.5,
-            "plane_scale": 0,
+            "flat_scale": 0.0,         # 平地上已由 flat_orientation_l2 覆盖，不重复罚
+            "nonflat_scale": -4.0,     # 爬行/不平地面重点防侧翻
             "base_params": {},
-            "pit_col_threshold": 7,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
 
-    # ── 统一的关节偏离（父类 joint_pos 的地形分权版本）──
+    # ── 统一的关节偏离（父类 joint_pos 的地形平坦度分权版本）──
     joint_pos = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": 0,
-            "plane_scale": -0.3,
+            "flat_scale": -0.3,       # 站平罚关节偏离
+            "nonflat_scale": 0.0,     # 爬行中放开
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
-            "dynamic_gravity_threshold": 0.95,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
     # ── 大腿 ──
     joint_pos_hip = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.01,
-            "plane_scale": 0,
+            "flat_scale": 0.0,         # 平地上已由 joint_pos 覆盖，不重复罚
+            "nonflat_scale": -0.01,    # 爬行中轻罚大腿偏离
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT"]),
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
-            "dynamic_gravity_threshold": 0.95,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
     # ── 小腿 ──
     joint_pos_kenn = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.03,
-            "plane_scale": 0,
+            "flat_scale": 0.0,         # 平地上已由 joint_pos 覆盖，不重复罚
+            "nonflat_scale": -0.03,    # 爬行中轻罚小腿偏离
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_KENN_JOINT"]),
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
-            "dynamic_gravity_threshold": 0.95,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
     # ── ABAD ──
     joint_pos_abad = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.15,
-            "plane_scale": 0,
+            "flat_scale": 0.0,         # 平地上已由 joint_pos 覆盖，不重复罚
+            "nonflat_scale": -0.15,    # 爬行中罚外展偏离
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.1,
             },
-            "dynamic_gravity_threshold": 0.95,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
 
@@ -227,16 +246,17 @@ class PlatformRewardsCfg(RewardsCfg):
     # ── 关节限位 ──
     # 只限制外展和小腿（大腿放开，爬台需要大幅度前后摆动）
     joint_pos_limits = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.joint_pos_limits,
-            "pit_scale": -5.0,
-            "plane_scale": -20.0,
+            "flat_scale": -20.0,      # 站平严格限位
+            "nonflat_scale": -5.0,    # 爬行中放宽限位
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
             },
-            "dynamic_gravity_threshold": 0.95,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
     # ── 腿部触地：坑 -3（爬台时容易蹭到），平地 -10（标准约束）──

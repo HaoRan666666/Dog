@@ -50,7 +50,7 @@ class SceneCfg(InteractiveSceneCfg):
             project_uvw=True,
             texture_scale=(0.25, 0.25),
         ),
-        debug_vis=False,#关闭调试可视化,（打开后发现显示了每个机器人的世界坐标系）
+        debug_vis=False,#关闭调试可视化,
    )
    robot = RP_wd_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
    height_scanner = RayCasterCfg(
