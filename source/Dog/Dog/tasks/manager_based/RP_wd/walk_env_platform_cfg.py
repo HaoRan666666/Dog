@@ -103,11 +103,11 @@ class PlatformCommandsCfg:
         debug_vis=True,
         # 坑地形：只前进，无旋转
         pit_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.2, 0.6), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
+            lin_vel_x=(0.1, 2.0), lin_vel_y=(0.0, 0.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
         ),
         # 平地：全向移动 + 旋转
         plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.5, 1.5), lin_vel_y=(-1.5, 1.5), ang_vel_z=(-1.0, 1.0), heading=(-3.14, 3.14)
+            lin_vel_x=(-2.5, 2.5), lin_vel_y=(-1.5, 1.5), ang_vel_z=(-2, 2), heading=(-3.14, 3.14)
         ),
         # num_cols=10, platform proportion=0.7 → 前7列是坑, 后3列是平地
         pit_col_threshold=7,

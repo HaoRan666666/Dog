@@ -83,8 +83,7 @@ def world2self(quat, v):
 def get_single_obs(actions, commands=(0.0, 0.0, 0.0)):
     """构建单帧观测 (53维)，不含历史堆叠。"""
     # IMU 传感器：framequat [qw,qx,qy,qz] (机体系→世界系)
-    # gyro 返回的是世界坐标系角速度，需要转到机体坐标系
-  # MuJoCo gyro 已经输出 IMU site 局部坐标系下的角速度
+    # gyro 输出的是 IMU site 局部坐标系(机体坐标系)下的角速度，可直接作为 base_ang_vel
     base_quat = torch.tensor(
         d.sensor('imu_quat').data.copy(),
         device=device,
