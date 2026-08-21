@@ -45,7 +45,7 @@ class GamepadSimple:
         cmd = [0.0, 0.0, 0.0]
         ly = self._axes[1]    # 左摇杆 Y 轴 (向上为负)
         lx = self._axes[0]    # 左摇杆 X 轴
-        rx = self._axes[3]    # 右摇杆 X 轴（转向）
+        rx = self._axes[2]    # 右摇杆 X 轴（转向）：8BitDo Ultimate 2C 用 ABS_Z(=js2) 报左右
         if abs(ly) > self._dead_zone:
             cmd[0] = -ly * self._vx
         if abs(lx) > self._dead_zone:

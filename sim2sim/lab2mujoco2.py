@@ -84,10 +84,21 @@ def get_single_obs(actions, commands=(0.0, 0.0, 0.0)):
     """构建单帧观测 (53维)，不含历史堆叠。"""
     # IMU 传感器：framequat [qw,qx,qy,qz] (机体系→世界系)
     # gyro 返回的是世界坐标系角速度，需要转到机体坐标系
-    base_quat = torch.tensor(d.sensor('imu_quat').data.copy(), device=device, dtype=torch.float32)
-    gyro_world = torch.tensor(d.sensor('imu_gyro').data.copy(), device=device, dtype=torch.float32)
-    base_ang_vel = world2self(base_quat, gyro_world)
+  # MuJoCo gyro 已经输出 IMU site 局部坐标系下的角速度
+    base_quat = torch.tensor(
+        d.sensor('imu_quat').data.copy(),
+        device=device,
+        dtype=torch.float32
+    )
 
+    gyro_local = torch.tensor(
+        d.sensor('imu_gyro').data.copy(),
+        device=device,
+        dtype=torch.float32
+    )
+
+    # 如果 IMU site 与 base_link 坐标轴一致，可以直接作为 base_ang_vel
+    base_ang_vel = gyro_local
     # 投影重力: world→body
     gravity = torch.tensor([0.0, 0.0, -1.0], device=device, dtype=torch.float32)
     projected_gravity = world2self(base_quat, gravity)
@@ -151,10 +162,10 @@ def main():
                         help="输入设备: keyboard (零指令站立) 或 gamepad")
     parser.add_argument("--device", type=str, default="/dev/input/js0",
                         help="手柄设备路径")
-    parser.add_argument("--vx", type=float, default=1.0, help="前进灵敏度")
-    parser.add_argument("--vy", type=float, default=1.0, help="横移灵敏度")
-    parser.add_argument("--wz", type=float, default=1.0, help="转向灵敏度")
-    parser.add_argument("--foxglove-host", type=str, default="127.0.0.1",
+    parser.add_argument("--vx", type=float, default=2.0, help="前进灵敏度")
+    parser.add_argument("--vy", type=float, default=2.0, help="横移灵敏度")
+    parser.add_argument("--wz", type=float, default=2.0, help="转向灵敏度")
+    parser.add_argument("--foxglove-host", type=str, default="0.0.0.0",
                         help="Foxglove WebSocket 绑定地址")
     parser.add_argument("--foxglove-port", type=int, default=8765,
                         help="Foxglove WebSocket 端口")
@@ -213,6 +224,13 @@ def main():
 
     # ── 启动 MuJoCo 渲染 ──────────────────────────────────────────
     with mujoco.viewer.launch_passive(m, d) as viewer:
+        # 相机跟随机器人 (base_link)
+        viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+        viewer.cam.trackbodyid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "base_link")
+        viewer.cam.lookat = [0, 0, 0.3]   # 视线中心: 机身略上方
+        viewer.cam.distance = 3.0         # 相机距离 (m)
+        viewer.cam.azimuth = 0            # 水平方位角: 0=正后方, 90/270=两侧, 180=正前方
+        viewer.cam.elevation = -20        # 俯仰角: 越负越俯视(越高), 0=平视, 正值会钻地下
 
         while viewer.is_running():
             if input_device is not None:

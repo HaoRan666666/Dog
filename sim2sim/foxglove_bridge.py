@@ -7,6 +7,8 @@
 
 import time
 
+import numpy as np
+
 import foxglove
 import mujoco
 from foxglove import channels as FChan
@@ -30,9 +32,14 @@ class FoxgloveBridge:
 
     topic:
       /tf           foxglove.FrameTransform  机身 + 4 足端 (3D 面板)
-      /joint_states foxglove.JointStates     16 关节位置/速度/力矩 (Plot 面板)
-      /imu          json                     姿态四元数 + 角速度 + 线加速度
+      /joint_states foxglove.JointStates     16 关节数组 (URDF/3D 用)
+      /joints/<NAME> foxglove.JointState    每关节一个 topic, Plot 面板按名选择
+      /imu/orientation foxglove.Quaternion  姿态四元数 (xyzw)
+      /imu/angular_velocity foxglove.Vector3 角速度
+      /imu/linear_acceleration foxglove.Vector3 线加速度
+      /imu/projected_gravity foxglove.Vector3 投影重力 (机体系单位向量)
       /scene        foxglove.SceneUpdate     简易骨架 (base 立方体 + 4 条腿折线)
+      /contacts     foxglove.SceneUpdate     接触点球体 (颜色/大小=接触力, base_link 品红高亮)
 
     Foxglove Studio 用 "Foxglove WebSocket" 连接 ws://<host>:<port>。
     """
@@ -49,8 +56,17 @@ class FoxgloveBridge:
 
         self._tf = FChan.FrameTransformChannel("/tf")
         self._joints = FChan.JointStatesChannel("/joint_states")
-        self._imu = foxglove.Channel("/imu", message_encoding="json")
+        # 每个关节一个 topic（foxglove.JointState 官方 schema），Plot 面板字段原生可选
+        self._joint_chans = {
+            name: FChan.JointStateChannel(f"/joints/{name}")
+            for name in MJ_JOINT_NAMES
+        }
+        self._imu_quat = FChan.QuaternionChannel("/imu/orientation")
+        self._imu_gyro = FChan.Vector3Channel("/imu/angular_velocity")
+        self._imu_acc = FChan.Vector3Channel("/imu/linear_acceleration")
+        self._imu_grav = FChan.Vector3Channel("/imu/projected_gravity")
         self._scene = FChan.SceneUpdateChannel("/scene")
+        self._contacts = FChan.SceneUpdateChannel("/contacts")
 
         # 机体 / 足端 / 腿部 body id (用于骨架和 TF)
         self._base_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "base_link")
@@ -69,7 +85,7 @@ class FoxgloveBridge:
 
         try:
             self._server = foxglove.start_server(name="rpwd_sim2sim", host=host, port=port)
-            print(f"[Foxglove] 服务已启动: ws://{host}:{port}  (topics: /tf /joint_states /imu /scene)")
+            print(f"[Foxglove] 服务已启动: ws://{host}:{port}  (topics: /tf /joint_states /joints/* /imu/* /scene /contacts)")
         except Exception as e:
             self._enabled = False
             print(f"[Foxglove] 启动失败 (端口被占用?): {e}")
@@ -96,6 +112,23 @@ class FoxgloveBridge:
         x, y, z = xyz
         return FMsg.Point3(x=float(x), y=float(y), z=float(z))
 
+    @staticmethod
+    def _world2self(wxyz, v):
+        """把世界系向量 v 旋转到机体坐标系（q* ⊗ v ⊗ q，逆旋转）。wxyz=[w,x,y,z]。"""
+        w, x, y, z = wxyz
+        vx, vy, vz = v
+        scale = 2.0 * w * w - 1.0
+        two_w = 2.0 * w
+        dot = x * vx + y * vy + z * vz
+        cx = y * vz - z * vy   # q_vec × v
+        cy = z * vx - x * vz
+        cz = x * vy - y * vx
+        return (
+            scale * vx - two_w * cx + 2.0 * dot * x,
+            scale * vy - two_w * cy + 2.0 * dot * y,
+            scale * vz - two_w * cz + 2.0 * dot * z,
+        )
+
     # ── 主发布 ──
     def publish(self):
         if not self._enabled:
@@ -115,6 +148,10 @@ class FoxgloveBridge:
         ]
         self._joints.log(FMsg.JointStates(timestamp=stamp, joints=joints))
 
+        # 1b) /joints/<NAME>: 每关节一个 topic (foxglove.JointState)，Plot 面板按 topic 名选择
+        for i, name in enumerate(MJ_JOINT_NAMES):
+            self._joint_chans[name].log(joints[i])
+
         # 2) /tf: 机身 + 4 足端
         base_pos = self._vec3(d.xpos[self._base_id])
         base_quat = self._quat_xyzw(d.xquat[self._base_id])
@@ -130,16 +167,17 @@ class FoxgloveBridge:
                 rotation=self._quat_xyzw(d.xquat[fid]),
             ))
 
-        # 3) /imu (json): 姿态 + 角速度 + 线加速度
+        # 3) /imu/*: 姿态/角速度/线加速度（各自独立 topic，官方 schema，字段原生可选）
         imu_q = d.sensor("imu_quat").data   # [w,x,y,z] 机体系→世界系
         imu_g = d.sensor("imu_gyro").data   # gyro 传感器读数
         lin_a = d.qacc[0:3]                 # 机体线加速度 (世界系)
-        self._imu.log({
-            "orientation": {"w": float(imu_q[0]), "x": float(imu_q[1]),
-                            "y": float(imu_q[2]), "z": float(imu_q[3])},
-            "angular_velocity": {"x": float(imu_g[0]), "y": float(imu_g[1]), "z": float(imu_g[2])},
-            "linear_acceleration": {"x": float(lin_a[0]), "y": float(lin_a[1]), "z": float(lin_a[2])},
-        })
+        self._imu_quat.log(FMsg.Quaternion(x=float(imu_q[1]), y=float(imu_q[2]),
+                                           z=float(imu_q[3]), w=float(imu_q[0])))
+        self._imu_gyro.log(FMsg.Vector3(x=float(imu_g[0]), y=float(imu_g[1]), z=float(imu_g[2])))
+        self._imu_acc.log(FMsg.Vector3(x=float(lin_a[0]), y=float(lin_a[1]), z=float(lin_a[2])))
+        # 投影重力：世界系 [0,0,-1] 转到机体系，与策略观测 projected_gravity 一致（单位向量）
+        pg = self._world2self(imu_q, (0.0, 0.0, -1.0))
+        self._imu_grav.log(FMsg.Vector3(x=float(pg[0]), y=float(pg[1]), z=float(pg[2])))
 
         # 4) /scene: 简易骨架 (base 立方体 + 4 条腿折线)
         lines = []
@@ -168,3 +206,43 @@ class FoxgloveBridge:
             lines=lines,
         )
         self._scene.log(FMsg.SceneUpdate(deletions=[], entities=[entity]))
+
+        # 5) /contacts: 接触点球体标记 (排查碰撞/弹跳)
+        self._publish_contacts(stamp)
+
+    def _publish_contacts(self, stamp):
+        """把 MuJoCo 接触点发布成 /contacts 的球体标记。
+
+        每个接触点一个球: 颜色按接触力绿(小)→红(大), 大小随力增大;
+        base_link 参与接触时用亮品红色高亮, 便于定位「机身被弹」的接触源。
+        """
+        d = self._d
+        spheres = []
+        for i in range(d.ncon):
+            c = d.contact[i]
+            force = np.zeros(6, dtype=np.float64)
+            mujoco.mj_contactForce(self._m, d, i, force)
+            fmag = float(np.linalg.norm(force[:3]))
+            t = min(1.0, fmag / 100.0)              # 100N 封顶
+            diam = 0.02 + 0.04 * t                   # 2~6cm 球
+            b1 = mujoco.mj_id2name(self._m, mujoco.mjtObj.mjOBJ_BODY, self._m.geom_bodyid[c.geom1])
+            b2 = mujoco.mj_id2name(self._m, mujoco.mjtObj.mjOBJ_BODY, self._m.geom_bodyid[c.geom2])
+            if b1 == "base_link" or b2 == "base_link":
+                r, g, b = 1.0, 0.0, 1.0              # 品红高亮
+            else:
+                r, g, b = t, 1.0 - t, 0.0            # 绿→红
+            spheres.append(FMsg.SpherePrimitive(
+                pose=FMsg.Pose(
+                    position=FMsg.Vector3(x=float(c.pos[0]), y=float(c.pos[1]), z=float(c.pos[2])),
+                    orientation=FMsg.Quaternion(x=0.0, y=0.0, z=0.0, w=1.0),
+                ),
+                size=FMsg.Vector3(x=diam, y=diam, z=diam),
+                color=FMsg.Color(r=r, g=g, b=b, a=0.85),
+            ))
+        self._contacts.log(FMsg.SceneUpdate(
+            deletions=[],
+            entities=[FMsg.SceneEntity(
+                timestamp=stamp, frame_id="world", id="rpwd_contacts", frame_locked=False,
+                spheres=spheres,
+            )],
+        ))
