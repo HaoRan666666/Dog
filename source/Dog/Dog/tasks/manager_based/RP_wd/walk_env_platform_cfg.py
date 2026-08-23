@@ -107,7 +107,7 @@ class PlatformCommandsCfg:
         ),
         # 平地：全向移动 + 旋转
         plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
-            lin_vel_x=(-2.5, 2.5), lin_vel_y=(-1.5, 1.5), ang_vel_z=(-2, 2), heading=(-3.14, 3.14)
+            lin_vel_x=(-1.5, 1.5), lin_vel_y=(-1.5, 1.5), ang_vel_z=(-1.0, 1.0), heading=(-3.14, 3.14)
         ),
         # num_cols=10, platform proportion=0.7 → 前7列是坑, 后3列是平地
         pit_col_threshold=7,
