@@ -91,6 +91,11 @@ class TerrainSplitVelocityCommand(UniformVelocityCommand):
         standing_env_ids = self.is_standing_env.nonzero(as_tuple=False).flatten()
         self.vel_command_b[standing_env_ids, :] = 0.0
 
+        # 平地地形翻倒时清零指令（专注起身）；坑地形爬台大幅前倾不误触发
+        fallen = self.robot.data.projected_gravity_b[:, 2] > self.cfg.fall_gravity_threshold
+        plane_fallen = fallen & ~self.is_pit_env
+        self.vel_command_b[plane_fallen, :] = 0.0
+
 
 @configclass
 class TerrainSplitVelocityCommandCfg(UniformVelocityCommandCfg):
@@ -106,6 +111,9 @@ class TerrainSplitVelocityCommandCfg(UniformVelocityCommandCfg):
 
     pit_col_threshold: int = MISSING
     """Terrain columns 0..threshold-1 are pits, threshold.. are plane."""
+
+    fall_gravity_threshold: float = -0.5
+    """g_z 超过此阈值（机身倾斜 >60°）即视为翻倒，清零平地地形 env 的速度指令。"""
 
     # 父类要求，实际不使用（_resample_command 已覆写，直接读 pit_ranges / plane_ranges）
     ranges: UniformVelocityCommandCfg.Ranges = field(default_factory=_default_ranges)

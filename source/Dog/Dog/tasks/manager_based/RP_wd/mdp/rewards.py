@@ -30,6 +30,8 @@ def terrain_split_reward(
     base_params: dict | None = None,
     pit_col_threshold: int = 7,
     dynamic_gravity_threshold: float | None = None,
+    plane_fallen_gate: bool = False,
+    fallen_threshold: float = 0.5,
 ) -> torch.Tensor:
     """按地形类型分别缩放任意奖励函数。
 
@@ -104,7 +106,30 @@ def terrain_split_reward(
         is_pit = terrain_types < pit_col_threshold
 
     scales = torch.where(is_pit, pit_scale, plane_scale)
-    return scales * base_reward
+    reward = scales * base_reward
+    if plane_fallen_gate:
+        reward = reward * (~plane_fallen_mask(env, pit_col_threshold, fallen_threshold)).float()
+    return reward
+
+
+def plane_fallen_mask(
+    env: "ManagerBasedRLEnv",
+    pit_col_threshold: int = 7,
+    fallen_threshold: float = 0.5,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """返回 (num_envs,) bool：是否「平地地形且翻倒」。
+
+    ``upright = -g_z``（站立=1、水平=0、仰面=-1），``upright < fallen_threshold``（默认 60°）判翻倒。
+    供 ``terrain_split_reward`` / ``flatness_split_reward`` 的 ``plane_fallen_gate`` 门控使用：
+    翻倒起身需要「腿撑地」「关节大幅摆动」，这些动作会触发相应惩罚、与起身方向打架，
+    故仅在 plane 且翻倒时清零这些干扰项；坑地形（terrain_types<7）is_plane 恒为 False，
+    即便爬台大幅前倾也完全不受影响。
+    """
+    is_plane = env.scene.terrain.terrain_types >= pit_col_threshold
+    upright = -env.scene[asset_cfg.name].data.projected_gravity_b[:, 2]
+    fallen = upright < fallen_threshold
+    return is_plane & fallen
 
 
 def is_flat_terrain(
@@ -138,6 +163,9 @@ def flatness_split_reward(
     base_params: dict | None = None,
     sensor_cfg: SceneEntityCfg = SceneEntityCfg("height_scanner"),
     flatness_threshold: float = 0.05,
+    pit_col_threshold: int = 7,
+    plane_fallen_gate: bool = False,
+    fallen_threshold: float = 0.5,
 ) -> torch.Tensor:
     """按脚下地形平坦度切换任意奖励函数。
 
@@ -199,7 +227,10 @@ def flatness_split_reward(
     base_reward = base_func(env, **base_params)
     is_flat = is_flat_terrain(env, sensor_cfg, flatness_threshold)
     scales = torch.where(is_flat.bool(), flat_scale, nonflat_scale)
-    return scales * base_reward
+    reward = scales * base_reward
+    if plane_fallen_gate:
+        reward = reward * (~plane_fallen_mask(env, pit_col_threshold, fallen_threshold)).float()
+    return reward
 
 
 def joint_pos_target_l2(env: ManagerBasedRLEnv, target: float, asset_cfg: SceneEntityCfg) -> torch.Tensor:
@@ -700,3 +731,38 @@ def base_fallen(
     asset: RigidObject = env.scene[asset_cfg.name]
     g = asset.data.projected_gravity_b
     return g[:, 2] > threshold
+
+
+def stand_up_reward(
+    env: "ManagerBasedRLEnv",
+    pit_col_threshold: float = 7,
+    fallen_threshold: float = 0.5,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """仅平地地形且倒地时奖励站起；坑地形/已站立返回 0。
+
+    ``upright = -g_z``（站立=1、水平=0、仰面=-1）直接奖励机身朝向，给翻转方向提供密集梯度。
+    整体缩放交给 RewTerm 的 ``weight`` 调节。仅在 plane 且倒地时生效，
+    因此不会干扰 pit 爬台（爬台大幅前倾也不会误触发）；
+    站起后的姿态微调交给关节默认偏移惩罚，故不再额外给高度奖励。
+    """
+    asset = env.scene[asset_cfg.name]
+    is_plane = env.scene.terrain.terrain_types >= pit_col_threshold
+    upright = -asset.data.projected_gravity_b[:, 2]
+    fallen = upright < fallen_threshold
+    mask = (is_plane & fallen).float()
+    return mask * upright
+
+
+def base_fallen_terrain_split(
+    env: "ManagerBasedRLEnv",
+    pit_threshold: float = 0.1,
+    pit_col_threshold: float = 7,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """仅坑地形翻倒即终止（保持原样）；平地地形翻倒不终止（留给起身）。"""
+    terrain_types = env.scene.terrain.terrain_types
+    g_z = env.scene[asset_cfg.name].data.projected_gravity_b[:, 2]
+    fallen = g_z > pit_threshold
+    is_pit = terrain_types < pit_col_threshold
+    return fallen & is_pit

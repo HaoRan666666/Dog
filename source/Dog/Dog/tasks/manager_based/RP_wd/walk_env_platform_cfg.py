@@ -174,6 +174,7 @@ class PlatformRewardsCfg(RewardsCfg):
             },
             "sensor_cfg": SceneEntityCfg("flatness_scanner"),
             "flatness_threshold": 0.05,
+            "plane_fallen_gate": True,
         },
     )
     # ── 大腿 ──
@@ -191,6 +192,7 @@ class PlatformRewardsCfg(RewardsCfg):
             },
             "sensor_cfg": SceneEntityCfg("flatness_scanner"),
             "flatness_threshold": 0.05,
+            "plane_fallen_gate": True,
         },
     )
     # ── 小腿 ──
@@ -208,6 +210,7 @@ class PlatformRewardsCfg(RewardsCfg):
             },
             "sensor_cfg": SceneEntityCfg("flatness_scanner"),
             "flatness_threshold": 0.05,
+            "plane_fallen_gate": True,
         },
     )
     # ── ABAD ──
@@ -225,6 +228,7 @@ class PlatformRewardsCfg(RewardsCfg):
             },
             "sensor_cfg": SceneEntityCfg("flatness_scanner"),
             "flatness_threshold": 0.05,
+            "plane_fallen_gate": True,
         },
     )
 
@@ -257,6 +261,7 @@ class PlatformRewardsCfg(RewardsCfg):
             },
             "sensor_cfg": SceneEntityCfg("flatness_scanner"),
             "flatness_threshold": 0.05,
+            "plane_fallen_gate": True,
         },
     )
     # ── 腿部触地：坑 -3（爬台时容易蹭到），平地 -10（标准约束）──
@@ -272,6 +277,7 @@ class PlatformRewardsCfg(RewardsCfg):
                 "threshold": 1.0,
             },
             "pit_col_threshold": 7,
+            "plane_fallen_gate": True,
         },
     )
     # ── 轮速惩罚：坑=0（允许蹭侧壁），平地=-0.05（引导用轮子而非伸腿横向移动）──
@@ -316,6 +322,10 @@ class PlatformRewardsCfg(RewardsCfg):
     # 加强动作变化率和关节加速度惩罚以抑制迁移时的抖动。
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.03)
 
+    # ── 翻倒起身（仅平地地形生效）──
+    # plane env 倒地时奖励站起；pit env / 已站立返回 0，不干扰爬台
+    stand_up = RewTerm(func=mdp.stand_up_reward, weight=4.0)
+
 
 # ── 平台终止配置 ──────────────────────────────────────────────────────
 @configclass
@@ -323,8 +333,11 @@ class PlatformTerminationsCfg:
     """平台终止条件：超时 + 侧翻/后倒（与爬台俯仰角无关）。"""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    # 机身翻倒（相对竖直倾斜 > 90°，方向无关：侧翻/后倒/四脚朝天）
-    base_fallen = DoneTerm(func=mdp.base_fallen, params={"threshold": 0.1})
+    # 仅坑地形翻倒终止（保持原样）；平地地形翻倒不终止，留给起身
+    base_fallen = DoneTerm(
+        func=mdp.base_fallen_terrain_split,
+        params={"pit_threshold": 0.1, "pit_col_threshold": 7},
+    )
 
 
 # ── 平台事件配置 ──────────────────────────────────────────────────────
@@ -336,19 +349,9 @@ class PlatformEventCfg(EventCfg):
     push_robot = None
 
     reset_base = EventTerm(
-        func=mdp.reset_root_state_uniform,
+        func=mdp.reset_plane_to_fallen,
         mode="reset",
-        params={
-            "pose_range": {"x": (0.0, 0.0), "y": (0.0, 0.0), "yaw": (0.0, 0.0)},
-            "velocity_range": {
-                "x": (-0.2, 0.2),
-                "y": (-0.2, 0.2),
-                "z": (-0.2, 0.2),
-                "roll": (-0.2, 0.2),
-                "pitch": (-0.2, 0.2),
-                "yaw": (-0.2, 0.2),
-            },
-        },
+        params={"fall_height": 0.2, "pit_col_threshold": 7},
     )
 
 
