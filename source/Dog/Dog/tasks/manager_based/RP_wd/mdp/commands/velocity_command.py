@@ -91,10 +91,9 @@ class TerrainSplitVelocityCommand(UniformVelocityCommand):
         standing_env_ids = self.is_standing_env.nonzero(as_tuple=False).flatten()
         self.vel_command_b[standing_env_ids, :] = 0.0
 
-        # 平地地形翻倒时清零指令（专注起身）；坑地形爬台大幅前倾不误触发
-        fallen = self.robot.data.projected_gravity_b[:, 2] > self.cfg.fall_gravity_threshold
-        plane_fallen = fallen & ~self.is_pit_env
-        self.vel_command_b[plane_fallen, :] = 0.0
+        # 翻倒时保持正常速度指令（不清零）：让速度追踪奖励
+        # （track_lin_vel/track_ang_vel）推着机器人翻身并继续运动，
+        # 而不是在指令=0 时把「躺着静止」当满分来奖励。
 
 
 @configclass

@@ -326,6 +326,25 @@ class PlatformRewardsCfg(RewardsCfg):
     # plane env 倒地时奖励站起；pit env / 已站立返回 0，不干扰爬台
     stand_up = RewTerm(func=mdp.stand_up_reward, weight=4.0)
 
+    # ── 静止关节偏离（继承自平地，翻倒时门控）──
+    # 平地翻倒时清零，避免「指令=0 时罚关节偏离」压制摆腿翻身
+    stand_still = RewTerm(
+        func=mdp.terrain_split_reward,
+        weight=-1.0,
+        params={
+            "base_func": mdp.stand_still_joint_deviation_l1,
+            "pit_scale": 1.0,
+            "plane_scale": 1.0,
+            "base_params": {
+                "command_name": "base_velocity",
+                "command_threshold": 0.05,
+                "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+            },
+            "pit_col_threshold": 7,
+            "plane_fallen_gate": True,
+        },
+    )
+
 
 # ── 平台终止配置 ──────────────────────────────────────────────────────
 @configclass
@@ -414,4 +433,4 @@ class RP_wd_Walk_Platform_Env_Play(RP_wd_Walk_Platform_Env):
 
         self.curriculum = None
         # 关闭 base 接触终止，爬台时容易蹭到平台边缘
-        self.terminations.base_contact = None
+        self.terminations.base_fallen = None
