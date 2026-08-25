@@ -736,22 +736,21 @@ def base_fallen(
 def stand_up_reward(
     env: "ManagerBasedRLEnv",
     pit_col_threshold: float = 7,
-    fallen_threshold: float = 0.5,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """仅平地地形且倒地时奖励站起；坑地形/已站立返回 0。
+    """仅平地地形奖励站起；坑地形返回 0。
 
     ``upright = -g_z``（站立=1、水平=0、仰面=-1）直接奖励机身朝向，给翻转方向提供密集梯度。
-    整体缩放交给 RewTerm 的 ``weight`` 调节。仅在 plane 且倒地时生效，
-    因此不会干扰 pit 爬台（爬台大幅前倾也不会误触发）；
-    站起后的姿态微调交给关节默认偏移惩罚，故不再额外给高度奖励。
+    返回 ``upright - 1``，即仰面=-2 / 侧躺=-1 / 站立=0，**全程单调无断崖**：
+    梯度始终指向「站直」，不会像旧版 ``fallen_threshold`` 硬阈值那样在 60° 处突然把奖励清零，
+    从而避免策略停在「侧躺/斜躺」而不是继续站起。整体缩放交给 RewTerm 的 ``weight`` 调节。
+    ``is_plane`` 门控保证 pit 爬台（爬台大幅前倾）完全不受影响；站立时奖励为 0，
+    不给正常行走加常量分。
     """
     asset = env.scene[asset_cfg.name]
     is_plane = env.scene.terrain.terrain_types >= pit_col_threshold
     upright = -asset.data.projected_gravity_b[:, 2]
-    fallen = upright < fallen_threshold
-    mask = (is_plane & fallen).float()
-    return mask * upright
+    return is_plane.float() * (upright - 1.0)
 
 
 def base_fallen_terrain_split(
