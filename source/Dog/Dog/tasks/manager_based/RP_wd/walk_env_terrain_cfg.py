@@ -113,29 +113,15 @@ class TerrainRewardsCfg(RewardsCfg):
     )
 
     # ── 大腿/小腿偏离：台阶轻罚（允许摆腿），平地标准 -0.3 ──
-    joint_pos_hip_kenn = RewTerm(
-        func=mdp.terrain_split_reward,
-        weight=1.0,
-        params={
-            "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.1,       # 台阶：轻罚
-            "plane_scale": -0.2,     # 平地：父类标准
-            "base_params": {
-                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"]),
-                "stand_still_scale": 5.0,
-                "velocity_threshold": 0.3,
-            },
-            "pit_col_threshold": 8,
-        },
-    )
+
     # ── ABAD：台阶加重惩罚防外展抬腿，平地标准 -0.3 ──
     joint_pos_abad = RewTerm(
         func=mdp.terrain_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.1,       # 台阶：防外展抬腿
-            "plane_scale": -0.2,     # 平地：父类标准
+            "pit_scale": -0.2,       # 台阶：防外展抬腿
+            "plane_scale": 0,     # 平地：父类标准
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
                 "stand_still_scale": 5.0,
@@ -145,8 +131,22 @@ class TerrainRewardsCfg(RewardsCfg):
         },
     )
 
-    # 台阶取消父类整体关节位置惩罚；平地由上面 hip_kenn/abad 各 -0.3 补齐标准 -0.3
-    joint_pos = None
+    # ── 整体关节偏离（全腿）：台阶松，平地标准；与上面 hip_kenn/abad 叠加 ──
+    joint_pos = RewTerm(
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.joint_position_penalty,
+            "pit_scale": 0.0,       # 台阶：放松（避免腿部受限）
+            "plane_scale": -0.3,     # 平地：父类标准
+            "base_params": {
+                "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
+                "stand_still_scale": 5.0,
+                "velocity_threshold": 0.3,
+            },
+            "pit_col_threshold": 8,
+        },
+    )
 
 @configclass
 class RP_wd_Walk_Terrain_Env(RP_wd_Walk_Flat_Env):
