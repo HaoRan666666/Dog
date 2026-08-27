@@ -8,7 +8,6 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
-import math
 
 from Dog.assets.terrain.step_terrain import STEP_TERRAINS_CFG
 
@@ -65,22 +64,23 @@ class TerrainObservationsCfg(ObservationsCfg):
 
 @configclass
 class TerrainCommandsCfg:
-    """地形环境的指令配置：加入 yaw 控制，提升复杂地形上的转向能力。"""
+    """地形环境的指令配置：台阶地形只前进（无 heading），平地全向 + heading。"""
 
-    base_velocity = mdp.UniformLevelVelocityCommandCfg(
+    base_velocity = mdp.TerrainSplitVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(8.0, 8.0),
         rel_standing_envs=0.05,
-        rel_heading_envs=1.0,
-        heading_command=True,
+        rel_heading_envs=1.0,           # 平地全部开启 heading（台阶已在 _resample_command 中置 False）
+        heading_command=True,           # 开启 heading（仅平地生效，台阶不受影响）
         heading_control_stiffness=0.5,
         debug_vis=True,
-        ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-2.0, 2.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.5, 1.5), heading=(-math.pi, math.pi)
+        pit_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(  # 台阶（前 8 列）：只前进，无 heading
+            lin_vel_x=(-1.0, 1.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(0.0, 0.0), heading=(0.0, 0.0)
         ),
-        limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-2.0, 2.0), lin_vel_y=(-1.0, 1.0), ang_vel_z=(-1.5, 1.5)
+         plane_ranges=mdp.TerrainSplitVelocityCommandCfg.Ranges(
+            lin_vel_x=(-1.5, 1.5), lin_vel_y=(-1.5, 1.5), ang_vel_z=(-1.0, 1.0), heading=(-3.14, 3.14)
         ),
+        pit_col_threshold=8,            # 前 8 列台阶，后 2 列平地
     )
 
 
@@ -93,32 +93,60 @@ class TerrainCurriculumCfg(CurriculumCfg):
 
 @configclass
 class TerrainRewardsCfg(RewardsCfg):
-    """地形奖励：移除不利于爬坡/上台阶的惩罚项。"""
+    """地形奖励：按台阶/平地分权（台阶松、平地严）。
 
-    # ── 降权重：保留基础姿态约束，防止"前倾滑行"作弊 ──
+    台阶（terrain_types < 8）保持宽松：爬升需要大幅俯仰/摆腿；
+    平地（terrain_types >= 8）恢复父类标准约束，保证全向步态质量。
+    """
+
+    # ── 整体姿态（g_x²+g_y²）：台阶宽松，平地标准 ──
     flat_orientation_l2 = RewTerm(
-        func=mdp.flat_orientation_l2, weight=-0.2)  # 平地 -2.5
+        func=mdp.terrain_split_reward,
+        weight=1.0,
+        params={
+            "base_func": mdp.flat_orientation_l2,
+            "pit_scale": -0.5,       # 台阶：当前宽松值
+            "plane_scale": -2.5,     # 平地：父类标准
+            "base_params": {},
+            "pit_col_threshold": 8,
+        },
+    )
 
-    # ── 降权重：台阶上允许更大关节偏移，但要保留一定约束 ──
+    # ── 大腿/小腿偏离：台阶轻罚（允许摆腿），平地标准 -0.3 ──
     joint_pos_hip_kenn = RewTerm(
-        func=mdp.joint_position_penalty,
-        weight=-0.1,
+        func=mdp.terrain_split_reward,
+        weight=1.0,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"]),
-            "stand_still_scale": 5.0,
-            "velocity_threshold": 0.3,
+            "base_func": mdp.joint_position_penalty,
+            "pit_scale": -0.1,       # 台阶：轻罚
+            "plane_scale": -0.2,     # 平地：父类标准
+            "base_params": {
+                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"]),
+                "stand_still_scale": 5.0,
+                "velocity_threshold": 0.3,
+            },
+            "pit_col_threshold": 8,
         },
     )
-    # ABAD 单独加重惩罚，防止外展抬腿
+    # ── ABAD：台阶加重惩罚防外展抬腿，平地标准 -0.3 ──
     joint_pos_abad = RewTerm(
-        func=mdp.joint_position_penalty,
-        weight=-0.4,
+        func=mdp.terrain_split_reward,
+        weight=1.0,
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
-            "stand_still_scale": 5.0,
-            "velocity_threshold": 0.3,
+            "base_func": mdp.joint_position_penalty,
+            "pit_scale": -0.1,       # 台阶：防外展抬腿
+            "plane_scale": -0.2,     # 平地：父类标准
+            "base_params": {
+                "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
+                "stand_still_scale": 5.0,
+                "velocity_threshold": 0.3,
+            },
+            "pit_col_threshold": 8,
         },
     )
+
+    # 台阶取消父类整体关节位置惩罚；平地由上面 hip_kenn/abad 各 -0.3 补齐标准 -0.3
+    joint_pos = None
 
 @configclass
 class RP_wd_Walk_Terrain_Env(RP_wd_Walk_Flat_Env):
