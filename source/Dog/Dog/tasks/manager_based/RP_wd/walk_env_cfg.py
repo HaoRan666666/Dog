@@ -177,7 +177,7 @@ class RewardsCfg:
     #抑制竖直速度过大
     lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-0.15)
     # #横滚和俯仰角速度
-    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.03)
+    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
     # #电机力矩
     dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-1.0e-5,
                              params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
@@ -235,14 +235,6 @@ class RewardsCfg:
                 "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
               },
     ) 
-
-    # base_height_l2 = RewTerm(
-    #     func=mdp.base_height_l2,
-    #     weight=-1.0,
-    #     params={
-    #         "target_height": 0.3,
-    #     },
-    # )
 
     wheel_vel_penalty = RewTerm(
         func=mdp.wheel_vel_penalty,

@@ -106,7 +106,7 @@ class TerrainRewardsCfg(RewardsCfg):
         params={
             "base_func": mdp.flat_orientation_l2,
             "pit_scale": -0.5,       # 台阶：当前宽松值
-            "plane_scale": -2.5,     # 平地：父类标准
+            "plane_scale": -3.5,     # 平地：父类标准
             "base_params": {},
             "pit_col_threshold": 8,
         },
@@ -148,6 +148,10 @@ class TerrainRewardsCfg(RewardsCfg):
         },
     )
 
+    # ── 动作变化惩罚（起步/停车翘头）：台阶任务单独加大，平滑轮速爬坡 ──
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.03)
+
+    wheel_vel_penalty = None
 @configclass
 class RP_wd_Walk_Terrain_Env(RP_wd_Walk_Flat_Env):
     """地形环境配置：继承平地环境，替换场景、观测和课程配置。"""
