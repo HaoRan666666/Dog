@@ -351,18 +351,18 @@
     <position name="LF_ABAD_JOINT_servo" joint="LF_ABAD_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
     <position name="LF_HIP_JOINT_servo" joint="LF_HIP_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
     <position name="LF_KENN_JOINT_servo" joint="LF_KENN_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
-    <velocity name="LF_FOOT_JOINT_servo" joint="LF_FOOT_JOINT" kv="3" forcelimited="true" forcerange="-17 17" />
+    <velocity name="LF_FOOT_JOINT_servo" joint="LF_FOOT_JOINT" kv="3" forcelimited="true" forcerange="-17 17" ctrllimited="true" ctrlrange="-42 42" />
     <position name="RF_ABAD_JOINT_servo" joint="RF_ABAD_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
     <position name="RF_HIP_JOINT_servo" joint="RF_HIP_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
     <position name="RF_KENN_JOINT_servo" joint="RF_KENN_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
-    <velocity name="RF_FOOT_JOINT_servo" joint="RF_FOOT_JOINT" kv="3" forcelimited="true" forcerange="-17 17" />
+    <velocity name="RF_FOOT_JOINT_servo" joint="RF_FOOT_JOINT" kv="3" forcelimited="true" forcerange="-17 17" ctrllimited="true" ctrlrange="-42 42" />
     <position name="LB_ABAD_JOINT_servo" joint="LB_ABAD_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
     <position name="LB_HIP_JOINT_servo" joint="LB_HIP_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
     <position name="LB_KENN_JOINT_servo" joint="LB_KENN_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
-    <velocity name="LB_FOOT_JOINT_servo" joint="LB_FOOT_JOINT" kv="3" forcelimited="true" forcerange="-17 17" />
+    <velocity name="LB_FOOT_JOINT_servo" joint="LB_FOOT_JOINT" kv="3" forcelimited="true" forcerange="-17 17" ctrllimited="true" ctrlrange="-42 42" />
     <position name="RB_ABAD_JOINT_servo" joint="RB_ABAD_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
     <position name="RB_HIP_JOINT_servo" joint="RB_HIP_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
     <position name="RB_KENN_JOINT_servo" joint="RB_KENN_JOINT" kp="100" kv="3" forcelimited="true" forcerange="-42 42" />
-    <velocity name="RB_FOOT_JOINT_servo" joint="RB_FOOT_JOINT" kv="3" forcelimited="true" forcerange="-17 17" />
+    <velocity name="RB_FOOT_JOINT_servo" joint="RB_FOOT_JOINT" kv="3" forcelimited="true" forcerange="-17 17" ctrllimited="true" ctrlrange="-42 42" />
   </actuator>
 </mujoco>

@@ -242,14 +242,14 @@ def main():
             single_obs = get_single_obs(actions=actions, commands=commands)
             history.append(single_obs)
             obs = build_history_obs(history)
-            obs = torch.clip(obs, -100, 100)
+            obs = torch.clip(obs, -150, 150)
 
             with torch.no_grad():
                 actions = policy(obs.unsqueeze(0)).squeeze(0)
 
             # action → actuator ctrl
             act = actions * ACTIONS_SCALE + DEFAULT_DOF_POS
-            act = torch.clip(act, -100, 100)
+            act = torch.clip(act, -150, 150)
             act_np = act.detach().cpu().numpy()
 
             for lab_idx, mj_idx in enumerate(LAB_ACT_TO_MJ_CTRL):
