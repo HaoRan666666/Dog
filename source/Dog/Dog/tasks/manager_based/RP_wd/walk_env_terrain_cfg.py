@@ -5,6 +5,7 @@ from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.sensors import RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
@@ -43,6 +44,17 @@ class TerrainSceneCfg(SceneCfg):
         debug_vis=False,
     )
 
+    # 平坦度判据专用小范围扫描：远小于台阶平台面（platform_width=1.5m），
+    # 避免起步左右晃动时射线越出台沿、把「站平」误判成「爬台阶」
+    flatness_scanner = RayCasterCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/base_link",
+        offset=RayCasterCfg.OffsetCfg(pos=(0.1, 0.0, 0.4)),
+        ray_alignment="yaw",
+        pattern_cfg=patterns.GridPatternCfg(resolution=0.05, size=[1.0, 0.4]),
+        debug_vis=False,
+        mesh_prim_paths=["/World/ground"],
+    )
+
 
 @configclass
 class TerrainObservationsCfg(ObservationsCfg):
@@ -69,7 +81,7 @@ class TerrainCommandsCfg:
     base_velocity = mdp.TerrainSplitVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(8.0, 8.0),
-        rel_standing_envs=0.05,
+        rel_standing_envs=0.001,
         rel_heading_envs=1.0,           # 平地全部开启 heading（台阶已在 _resample_command 中置 False）
         heading_command=True,           # 开启 heading（仅平地生效，台阶不受影响）
         heading_control_stiffness=0.5,
@@ -93,22 +105,23 @@ class TerrainCurriculumCfg(CurriculumCfg):
 
 @configclass
 class TerrainRewardsCfg(RewardsCfg):
-    """地形奖励：按台阶/平地分权（台阶松、平地严）。
+    """地形奖励：按脚下平坦度分权（台阶松、平地严）。
 
-    台阶（terrain_types < 8）保持宽松：爬升需要大幅俯仰/摆腿；
-    平地（terrain_types >= 8）恢复父类标准约束，保证全向步态质量。
+    台阶/坡面（不平坦）保持宽松：爬升需要大幅俯仰/摆腿；
+    平地（平坦）恢复父类标准约束，保证全向步态质量。
     """
 
     # ── 整体姿态（g_x²+g_y²）：台阶宽松，平地标准 ──
     flat_orientation_l2 = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.flat_orientation_l2,
-            "pit_scale": -0.5,       # 台阶：当前宽松值
-            "plane_scale": -3.5,     # 平地：父类标准
+            "flat_scale": -2.5,       # 平地：父类标准
+            "nonflat_scale": -0.0,    # 台阶：当前宽松值
             "base_params": {},
-            "pit_col_threshold": 8,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
 
@@ -116,35 +129,37 @@ class TerrainRewardsCfg(RewardsCfg):
 
     # ── ABAD：台阶加重惩罚防外展抬腿，平地标准 -0.3 ──
     joint_pos_abad = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": -0.2,       # 台阶：防外展抬腿
-            "plane_scale": 0,     # 平地：父类标准
+            "flat_scale": 0,          # 平地：父类标准
+            "nonflat_scale": -0.2,    # 台阶：防外展抬腿
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
-            "pit_col_threshold": 8,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
 
     # ── 整体关节偏离（全腿）：台阶松，平地标准；与上面 hip_kenn/abad 叠加 ──
     joint_pos = RewTerm(
-        func=mdp.terrain_split_reward,
+        func=mdp.flatness_split_reward,
         weight=1.0,
         params={
             "base_func": mdp.joint_position_penalty,
-            "pit_scale": 0.0,       # 台阶：放松（避免腿部受限）
-            "plane_scale": -0.3,     # 平地：父类标准
+            "flat_scale": -0.3,      # 平地：父类标准
+            "nonflat_scale": 0.0,    # 台阶：放松（避免腿部受限）
             "base_params": {
                 "asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS),
                 "stand_still_scale": 5.0,
                 "velocity_threshold": 0.3,
             },
-            "pit_col_threshold": 8,
+            "sensor_cfg": SceneEntityCfg("flatness_scanner"),
+            "flatness_threshold": 0.05,
         },
     )
 
