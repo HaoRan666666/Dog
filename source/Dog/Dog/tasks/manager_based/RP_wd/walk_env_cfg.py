@@ -187,15 +187,17 @@ class RewardsCfg:
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
     energy = RewTerm(func=mdp.energy, weight=-2e-4,
                      params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
-    # feet_air_time = RewTerm(
-    #     func=mdp.feet_air_time,
-    #     weight=-1,
-    #     params={
-    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-    #         "command_name": "base_velocity",
-    #         "threshold": 0.5,
-    #     },
-    # )
+    
+    feet_air_time = RewTerm(
+        func=mdp.feet_air_time,
+        weight=-0.5,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+            "command_name": "base_velocity",
+            "threshold": 0.5,
+        },
+    )
+    
     # base_link 触地独立惩罚（后倒/侧翻直接标志），权重更高
     base_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,
@@ -238,7 +240,7 @@ class RewardsCfg:
 
     wheel_vel_penalty = RewTerm(
         func=mdp.wheel_vel_penalty,
-        weight=-0.05,
+        weight=-0.3,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
             "command_name": "base_velocity",

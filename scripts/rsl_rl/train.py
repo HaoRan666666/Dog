@@ -175,6 +175,17 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
     env = gym.make(args_cli.task, cfg=env_cfg,
                    render_mode="rgb_array" if args_cli.video else None)
 
+    # ── 打印一次机器人关节顺序（DOF 顺序），用于核对 action/观测的关节映射 ──
+    if isinstance(env_cfg, ManagerBasedRLEnvCfg):
+        try:
+            robot = env.unwrapped.scene["robot"]
+            joint_names = list(robot.data.joint_names)
+            print(f"[INFO] 机器人关节顺序（共 {len(joint_names)} 个 DOF）：")
+            for i, name in enumerate(joint_names):
+                print(f"  [{i:2d}] {name}")
+        except Exception as e:  # noqa: BLE001
+            print(f"[WARN] 打印关节顺序失败：{e}")
+
     # 多智能体环境转单智能体
     if isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
