@@ -263,6 +263,85 @@ def feet_air_time(
     reward *= torch.norm(env.command_manager.get_command(command_name)[:, :2], dim=1) > 0.1
     return reward
 
+
+def _step_command_gate(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    vy_scale: float = 0.3,
+    yaw_scale: float = 0.8,
+) -> torch.Tensor:
+    """横移/转向软门控，值 ∈ [0,1]；静止或纯前后运动时≈0。
+
+    ``cmd[:, 1]`` 为横移线速度指令 vy，``cmd[:, 2]`` 为转向角速度指令 wz。
+    只有横移/转向指令非零时才放开摆动腿相关约束，避免静止/纯前进时无意义踏步。
+    """
+    cmd = env.command_manager.get_command(command_name)
+    vy_gate = torch.clamp(torch.abs(cmd[:, 1]) / vy_scale, 0.0, 1.0)
+    yaw_gate = torch.clamp(torch.abs(cmd[:, 2]) / yaw_scale, 0.0, 1.0)
+    return torch.maximum(vy_gate, yaw_gate)
+
+
+def feet_clearance(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    asset_cfg: SceneEntityCfg,
+    target_clearance: float = 0.05,
+    std: float = 0.02,
+    wheel_radius: float = 0.1025,
+    vy_scale: float = 0.3,
+    yaw_scale: float = 0.8,
+) -> torch.Tensor:
+    """鼓励摆动腿达到合理抬腿高度（目标 0.05m），而非越高越好。
+
+    离地高度以**轮子最下方**为基准：``轮轴(FOOT_LINK link 原点)高度 - wheel_radius``。
+    FOOT_LINK 的 link 原点就是轮轴（MJCF 里 wheel 圆柱 size="0.1025 0.02"、中心即 body 原点），
+    因此落地时 clearance≈0、抬起 5cm 时 clearance≈0.05。用 Gaussian 目标跟踪，
+    支撑腿（clearance≈0）贡献≈0，只有抬起接近目标高度的摆动腿拿到奖励。
+    仅在横移/转向时生效。
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    # 轮轴（FOOT_LINK 的 link 原点）世界系高度 [N, n_feet]
+    foot_axle_z = asset.data.body_link_pos_w[:, asset_cfg.body_ids, 2]
+    clearance = foot_axle_z - wheel_radius
+    err = clearance - target_clearance
+    reward = torch.sum(torch.exp(-0.5 * (err / std) ** 2), dim=1)
+    reward = reward * _step_command_gate(env, command_name, vy_scale, yaw_scale)
+    return reward
+
+
+def leg_usage_balance(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    sensor_cfg: SceneEntityCfg,
+    ema_decay: float = 0.02,
+    vy_scale: float = 0.3,
+    yaw_scale: float = 0.8,
+) -> torch.Tensor:
+    """惩罚四条腿长期离地占比不均（防止只有固定两条腿参与踏步）。
+
+    每条腿维护一个「当前是否离地」的 EMA（离地=1、着地=0），近似长期离地占比；
+    再惩罚四条腿 EMA 的方差。不强制 trot / 对角 / gait phase，只要求四条腿参与度均衡。
+    仅在横移/转向时生效。
+
+    返回正数（方差），配合 config 里的负 ``weight`` 作为惩罚使用。
+    """
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    in_air = (contact_sensor.data.current_air_time[:, sensor_cfg.body_ids] > 0).float()  # [N, n_feet]
+
+    # 持久化 EMA 缓冲（挂在 env 上跨步保留，与 action_sync 的缓存做法一致）
+    if not hasattr(env, "_leg_air_usage_ema"):
+        env._leg_air_usage_ema = torch.zeros_like(in_air)
+    ema = (1.0 - ema_decay) * env._leg_air_usage_ema + ema_decay * in_air
+    # 新 episode 起步处重置 EMA
+    new_ep = (env.episode_length_buf <= 1).unsqueeze(-1)
+    ema = torch.where(new_ep, in_air, ema)
+    env._leg_air_usage_ema = ema.detach()
+
+    usage_var = ema.var(dim=1)  # [N]
+    reward = usage_var * _step_command_gate(env, command_name, vy_scale, yaw_scale)
+    return reward
+
+
 class GaitReward(ManagerTermBase):
     """Gait enforcing reward term for quadrupeds.
 

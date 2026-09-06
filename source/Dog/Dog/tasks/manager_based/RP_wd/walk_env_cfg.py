@@ -158,7 +158,7 @@ class ObservationsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 #策略网络输出的 action 是什么格式，以及如何把神经网络的输出映射到机器人关节上。
-    joint_pos_abad = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_ABAD_JOINT"], scale=0.25, use_default_offset=True,preserve_order=True)
+    joint_pos_abad = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_ABAD_JOINT"], scale=0.125, use_default_offset=True,preserve_order=True)
     joint_pos_legs = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"], scale=0.25, use_default_offset=True,preserve_order=True)
     joint_pos_wheels = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=[".*_FOOT_JOINT"], scale=5.0, use_default_offset=False,preserve_order=True)
 #use_default_offset=True  让机器人动作中心从"0"变成"默认站立姿态"。
@@ -190,11 +190,33 @@ class RewardsCfg:
     
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
-        weight=-0.5,
+        weight=0.5,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
             "command_name": "base_velocity",
-            "threshold": 0.5,
+            "threshold": 0.3,
+        },
+    )
+    # 抬腿高度目标跟踪：轮子最下方离地≈0.05m 奖励最高（不是越高越好）
+    feet_clearance = RewTerm(
+        func=mdp.feet_clearance,
+        weight=1.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*FOOT_LINK"),
+            "command_name": "base_velocity",
+            "target_clearance": 0.05,
+            "std": 0.02,
+            "wheel_radius": 0.1025,
+        },
+    )
+    # 四腿离地占比均衡：惩罚只有固定两条腿踏步（EMA 方差，返回正数配负权重）
+    leg_usage_balance = RewTerm(
+        func=mdp.leg_usage_balance,
+        weight=-2.0,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+            "command_name": "base_velocity",
+            "ema_decay": 0.02,
         },
     )
 
