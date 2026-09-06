@@ -754,6 +754,64 @@ def side_tilt_l2(env: "ManagerBasedRLEnv") -> torch.Tensor:
     return torch.square(env.scene["robot"].data.projected_gravity_b[:, 1])
 
 
+def upright_orientation_l2(env: "ManagerBasedRLEnv") -> torch.Tensor:
+    """惩罚机身偏离「竖直」姿态（用于双轮足后腿站立）。
+
+    与 ``flat_orientation_l2``（罚 ``g_x²+g_y²``，让机身 Z 轴对齐重力 = 机身水平）相反，
+    双轮足站立要求机身 X 轴朝上（机身竖直），故改为罚 ``g_y²+g_z²``：
+    - 机身竖直（g ≈ [±1, 0, 0]）→ 0；
+    - 机身水平（g ≈ [0, 0, -1]）→ 1。
+
+    对 g_x 符号对称（机头朝上/朝下都给 0），上下方向由前腿/机身触地惩罚打破对称。
+    """
+    g = env.scene["robot"].data.projected_gravity_b
+    return torch.sum(torch.square(g[:, 1:]), dim=1)
+
+
+def track_lin_vel_heading_exp(
+    env: "ManagerBasedRLEnv",
+    command_name: str = "base_velocity",
+    std: float = 0.5,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """沿朝向（facing）方向的前向速度追踪（双轮足自平衡 + 转向用）。
+
+    双轮足站起后 body-x 朝上，机体系 ``track_lin_vel_xy_exp`` 会错位；「前进」应为机身面朝的方向。
+    用 body-z 轴的世界投影（站起后 body-z 指向后方）取反得到朝向单位向量，
+    把世界系速度投影到朝向上，与命令 ``[:, 0]`` 比较。这样不管俯仰/朝向如何，
+    「前进」始终是机身面朝的方向，且对转向鲁棒。
+    """
+    asset = env.scene[asset_cfg.name]
+    # 朝向 = -body-z 的水平投影（body-z 站起后指向后方，取反即面朝方向）
+    body_z_w = math_utils.quat_apply(
+        asset.data.root_link_quat_w,
+        torch.tensor([0.0, 0.0, 1.0], device=env.device),
+    )
+    facing = -body_z_w[:, :2]
+    facing = facing / torch.norm(facing, dim=-1, keepdim=True).clamp(min=1e-6)
+    forward_speed = torch.sum(asset.data.root_lin_vel_w[:, :2] * facing, dim=-1)
+    lin_vel_error = torch.square(env.command_manager.get_command(command_name)[:, 0] - forward_speed)
+    return torch.exp(-lin_vel_error / std**2)
+
+
+def track_ang_vel_w_z_exp(
+    env: "ManagerBasedRLEnv",
+    command_name: str = "base_velocity",
+    std: float = 0.5,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """世界系 yaw 角速度追踪（双轮足转向用）。
+
+    双轮足站起后 body-z 不再是竖直轴，机体系 ``track_ang_vel_z_exp``（追 ``root_ang_vel_b[:, 2]``）
+    会错位；转向是绕世界 z 的 yaw，直接比 ``root_ang_vel_w[:, 2]`` 与命令 ``[:, 2]``。
+    """
+    asset = env.scene[asset_cfg.name]
+    ang_vel_error = torch.square(
+        env.command_manager.get_command(command_name)[:, 2] - asset.data.root_ang_vel_w[:, 2]
+    )
+    return torch.exp(-ang_vel_error / std**2)
+
+
 def flat_on_flat_terrain(
     env: "ManagerBasedRLEnv",
     sensor_cfg: SceneEntityCfg = SceneEntityCfg("height_scanner"),
