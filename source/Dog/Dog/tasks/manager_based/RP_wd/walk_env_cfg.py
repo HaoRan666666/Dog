@@ -158,7 +158,7 @@ class ObservationsCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 #策略网络输出的 action 是什么格式，以及如何把神经网络的输出映射到机器人关节上。
-    joint_pos_abad = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_ABAD_JOINT"], scale=0.125, use_default_offset=True,preserve_order=True)
+    joint_pos_abad = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_ABAD_JOINT"], scale=0.25, use_default_offset=True,preserve_order=True)
     joint_pos_legs = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"], scale=0.25, use_default_offset=True,preserve_order=True)
     joint_pos_wheels = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=[".*_FOOT_JOINT"], scale=5.0, use_default_offset=False,preserve_order=True)
 #use_default_offset=True  让机器人动作中心从"0"变成"默认站立姿态"。
@@ -184,7 +184,7 @@ class RewardsCfg:
 #   #关节加速度
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
 #   #动作变化
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.02)
     energy = RewTerm(func=mdp.energy, weight=-2e-4,
                      params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
     
@@ -197,7 +197,7 @@ class RewardsCfg:
             "threshold": 0.5,
         },
     )
-    
+
     # base_link 触地独立惩罚（后倒/侧翻直接标志），权重更高
     base_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,
