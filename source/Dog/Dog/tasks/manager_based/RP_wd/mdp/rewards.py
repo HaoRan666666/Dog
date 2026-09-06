@@ -785,7 +785,9 @@ def track_lin_vel_heading_exp(
     # 朝向 = -body-z 的水平投影（body-z 站起后指向后方，取反即面朝方向）
     body_z_w = math_utils.quat_apply(
         asset.data.root_link_quat_w,
-        torch.tensor([0.0, 0.0, 1.0], device=env.device),
+        torch.tensor([0.0, 0.0, 1.0], device=env.device).repeat(
+            asset.data.root_link_quat_w.shape[0], 1
+        ),
     )
     facing = -body_z_w[:, :2]
     facing = facing / torch.norm(facing, dim=-1, keepdim=True).clamp(min=1e-6)
