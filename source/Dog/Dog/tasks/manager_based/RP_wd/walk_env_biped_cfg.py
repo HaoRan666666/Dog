@@ -94,6 +94,8 @@ class BipedRewardsCfg(FlatRewardsCfg):
     feet_air_time = None
     feet_clearance = None
     leg_usage_balance = None
+    # 足端落地冲击速度：双轮足不抬腿（无下放），移除。
+    feet_landing_impact = None
 
     # 沿朝向的前向速度追踪：命令 [:0] 视为「沿机身面朝方向」的速度。
     track_lin_vel_heading_exp = RewTerm(

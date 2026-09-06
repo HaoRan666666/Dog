@@ -243,25 +243,49 @@ def joint_pos_target_l2(env: ManagerBasedRLEnv, target: float, asset_cfg: SceneE
     return torch.sum(torch.square(joint_pos - target), dim=1)
 
 def feet_air_time(
-    env: ManagerBasedRLEnv, command_name: str, sensor_cfg: SceneEntityCfg, threshold: float
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    sensor_cfg: SceneEntityCfg,
+    target_air_time: float,
+    std: float = 0.15,
 ) -> torch.Tensor:
-    """Reward long steps taken by the feet using L2-kernel.
+    """目标型抬腿时间奖励：摆动腿离地时长接近 ``target_air_time`` 时奖励最高。
 
-    This function rewards the agent for taking steps that are longer than a threshold. This helps ensure
-    that the robot lifts its feet off the ground and takes steps. The reward is computed as the sum of
-    the time for which the feet are in the air.
-
-    If the commands are small (i.e. the agent is not supposed to take a step), then the reward is zero.
+    在足端第一次触地（first_contact）那一帧结算：离地时长 ``last_air_time`` 越接近
+    ``target_air_time``（Gaussian 核）奖励越高；离地过短或过长（一直抬着）都拿不到奖励，
+    从而抑制「某条腿一直抬着」的白嫖行为。静止（命令≈0）时不奖励。
     """
-    # extract the used quantities (to enable type-hinting)
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
-    # compute the reward
     first_contact = contact_sensor.compute_first_contact(env.step_dt)[:, sensor_cfg.body_ids]
     last_air_time = contact_sensor.data.last_air_time[:, sensor_cfg.body_ids]
-    reward = torch.sum((last_air_time - threshold) * first_contact, dim=1)
+    err = last_air_time - target_air_time
+    reward = torch.sum(torch.exp(-torch.square(err / std)) * first_contact, dim=1)
     # no reward for zero command
     reward *= torch.norm(env.command_manager.get_command(command_name)[:, :2], dim=1) > 0.1
     return reward
+
+
+def feet_landing_impact(
+    env: ManagerBasedRLEnv,
+    sensor_cfg: SceneEntityCfg,
+) -> torch.Tensor:
+    """惩罚足端落地瞬间的接触冲击力（法向反作用力峰值）。
+
+    只在足端第一次触地（first_contact）那一帧结算：取历史窗口内足端法向接触力的峰值，
+    越大代表落地越「砸」。摆动/支撑中的足端（first_contact=0）不参与。返回正数，
+    配合 config 里的负 ``weight`` 使用。
+
+    注意用 ``net_forces_w_history`` 取窗口峰值而非 ``net_forces_w``：reward 在全部
+    decimation 子步结算完后才跑，此刻 ``net_forces_w`` 已是「接触稳定后的支撑力」，
+    不是冲击尖峰；历史缓冲才能抓到落地那一瞬间的峰值法向力。
+    """
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    first_contact = contact_sensor.compute_first_contact(env.step_dt)[:, sensor_cfg.body_ids]  # [N, n_feet]
+    # net_forces_w_history: [N, T, num_bodies, 3] → 足端法向(z)分量 → 历史峰值
+    force_hist = contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, 2]  # [N, T, n_feet]
+    peak_force = force_hist.amax(dim=1)  # [N, n_feet]
+    impact = torch.clamp(peak_force, min=0.0)  # 地面向上推的正法向力即冲击
+    return torch.sum(impact * first_contact.float(), dim=1)  # [N]
 
 
 def _step_command_gate(

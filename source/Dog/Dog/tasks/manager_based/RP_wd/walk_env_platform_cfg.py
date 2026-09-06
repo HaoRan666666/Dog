@@ -345,6 +345,12 @@ class PlatformRewardsCfg(RewardsCfg):
         },
     )
 
+    # ── 足端步态奖励：暂移除（平台爬台不需要正常踏步步态），后续需要再加 ──
+    feet_air_time = None
+    feet_landing_impact = None
+    feet_clearance = None
+    leg_usage_balance = None
+
 
 # ── 平台终止配置 ──────────────────────────────────────────────────────
 @configclass
