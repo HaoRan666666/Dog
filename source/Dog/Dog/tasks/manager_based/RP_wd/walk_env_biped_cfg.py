@@ -118,6 +118,48 @@ class BipedRewardsCfg(FlatRewardsCfg):
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT", ".*_KENN_JOINT"])},
     )
 
+    # 前腿不外摆：罚前腿 ABAD 偏离 0，把前腿收回腰部附近而非向两侧张开。
+    # joint_deviation_l1 无条件返回 Σ|q_ABAD|（ABAD 默认=0），配合负权重驱动前腿并拢。
+    front_abad_penalty = RewTerm(
+        func=mdp.joint_deviation_l1,
+        weight=-1.0,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=["[L,R]F_ABAD_JOINT"])},
+    )
+
+    # 前轮不空转：站起后前轮离地，不应无谓转动。罚前轮（LF/RF FOOT）转速。
+    # wheel_vel_penalty 里 in_air 门控对前轮（始终离地）恒为 1，running/standing 都退化成「罚前轮转速」；
+    # 后轮（驱动轮）不在 asset_cfg 内，不受影响。
+    front_wheel_vel_penalty = RewTerm(
+        func=mdp.wheel_vel_penalty,
+        weight=-0.5,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names="[L,R]F_FOOT_LINK"),
+            "command_name": "base_velocity",
+            "velocity_threshold": 0.5,
+            "command_threshold": 0.1,
+            "asset_cfg": SceneEntityCfg("robot", joint_names="[L,R]F_FOOT_JOINT"),
+        },
+    )
+
+    # 左右腿镜像对称：HIP/KENN（俯仰）左右同号、ABAD（侧摆）左右反号，前后腿都约束。
+    leg_symmetry = RewTerm(
+        func=mdp.leg_symmetry_l2,
+        weight=-1.0,
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "same_pairs": [
+                ["LF_HIP_JOINT", "RF_HIP_JOINT"],
+                ["LF_KENN_JOINT", "RF_KENN_JOINT"],
+                ["LB_HIP_JOINT", "RB_HIP_JOINT"],
+                ["LB_KENN_JOINT", "RB_KENN_JOINT"],
+            ],
+            "opposite_pairs": [
+                ["LF_ABAD_JOINT", "RF_ABAD_JOINT"],
+                ["LB_ABAD_JOINT", "RB_ABAD_JOINT"],
+            ],
+        },
+    )
+
     # ── 继承项移除（None）：站立/关节位形/轮速相关惩罚不适合双轮足 ────────
     stand_still = None
     joint_pos = None

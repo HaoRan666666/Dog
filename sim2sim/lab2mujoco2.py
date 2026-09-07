@@ -54,14 +54,6 @@ ACTIONS_SCALE = torch.tensor([
     5.0, 5.0, 5.0, 5.0,              # FOOT: LB, LF, RB, RF
 ], device=device, dtype=torch.float32)
 
-# ── Action 关节名 (与 ACTIONS_SCALE 顺序一致: LB→LF→RB→RF) ──────────
-ACTION_JOINT_NAMES = [
-    "LB_ABAD", "LF_ABAD", "RB_ABAD", "RF_ABAD",
-    "LB_HIP", "LF_HIP", "RB_HIP", "RF_HIP",
-    "LB_KENN", "LF_KENN", "RB_KENN", "RF_KENN",
-    "LB_FOOT", "LF_FOOT", "RB_FOOT", "RF_FOOT",
-]
-
 # def world2self(quat, v):
 #     """将世界坐标系向量旋转到机体坐标系.
 #     quat: [qw, qx, qy, qz] (Isaac Lab/MuJoCo 均为 wxyz 标量在前)
@@ -229,20 +221,8 @@ def main():
                                      port=args.foxglove_port,
                                      enabled=not args.no_foxglove)
 
-    # ── 按键打印：按 X 打印一次输入(观测)/输出(动作) ───────────────
-    # 用 list 包装成跨线程可变标志（key_callback 在 viewer 线程回调）
-    print_flag = [False]
-
-    def on_key(key: int) -> None:
-        # MuJoCo/GLFW 字母键码为大写 ASCII，同时兼容小写
-        if key == ord("X") or key == ord("x"):
-            print_flag[0] = True
-        else:
-            # 诊断：打印未识别按键码，方便确认回调是否触发、X 的实际键值
-            print(f"[key] 按键码 {key} (X={ord('X')}, x={ord('x')}) 未触发打印")
-
     # ── 启动 MuJoCo 渲染 ──────────────────────────────────────────
-    with mujoco.viewer.launch_passive(m, d, key_callback=on_key) as viewer:
+    with mujoco.viewer.launch_passive(m, d) as viewer:
         # 相机跟随机器人 (base_link)
         viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
         viewer.cam.trackbodyid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "base_link")
@@ -274,28 +254,6 @@ def main():
 
             for lab_idx, mj_idx in enumerate(LAB_ACT_TO_MJ_CTRL):
                 d.ctrl[mj_idx] = act_np[lab_idx]
-
-            # ── 按 X 打印一次输入(观测)/输出(动作) ─────────────────
-            if print_flag[0]:
-                print_flag[0] = False
-                print("=" * 72)
-                print("[sim2sim 打印] 输入(观测) / 输出(动作)")
-                print("-" * 72)
-                print("[输入 obs] 当前帧 53 维（策略实际输入 = 3 帧历史堆叠成 159 维）")
-                print(f"  base_ang_vel      ( 3) : {[f'{x:+.4f}' for x in single_obs[0:3].tolist()]}")
-                print(f"  projected_gravity ( 3) : {[f'{x:+.4f}' for x in single_obs[3:6].tolist()]}")
-                print(f"  velocity_commands ( 3) : {[f'{x:+.4f}' for x in single_obs[6:9].tolist()]}")
-                print(f"  joint_pos 腿部    (12) : {[f'{x:+.4f}' for x in single_obs[9:21].tolist()]}")
-                print(f"  joint_vel 全部    (16) : {[f'{x:+.4f}' for x in single_obs[21:37].tolist()]}")
-                print(f"  last_action       (16) : {[f'{x:+.4f}' for x in single_obs[37:53].tolist()]}")
-                print("-" * 72)
-                print("[输出 action] 策略原始输出 16 维（归一化）")
-                for i, name in enumerate(ACTION_JOINT_NAMES):
-                    print(f"    {name:>8}: {actions[i].item():+.4f}")
-                print("  缩放后目标关节角 (action*scale + default):")
-                for i, name in enumerate(ACTION_JOINT_NAMES):
-                    print(f"    {name:>8}: {act[i].item():+.4f}")
-                print("=" * 72)
 
             # 8 步物理仿真 = 0.02s = 50Hz
             step_start = time.time()

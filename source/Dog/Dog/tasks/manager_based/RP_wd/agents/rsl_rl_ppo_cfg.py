@@ -54,3 +54,10 @@ class PPORunnerPlatformCfg(PPORunnerCfg):
     """高台/平台任务的 Runner 配置：与平地共享超参，仅用独立 experiment_name 区分日志目录。"""
 
     experiment_name = "RP_wd_walk_platform"
+
+
+@configclass
+class PPORunnerBipedCfg(PPORunnerCfg):
+    """双轮足（后腿站立）任务的 Runner 配置：与平地共享超参，仅用独立 experiment_name 区分日志目录。"""
+
+    experiment_name = "RP_wd_walk_biped"

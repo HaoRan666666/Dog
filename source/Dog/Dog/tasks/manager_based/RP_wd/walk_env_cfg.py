@@ -219,16 +219,6 @@ class RewardsCfg:
     #         "wheel_radius": 0.1025,
     #     },
     # )
-    # 四腿离地占比均衡：惩罚只有固定两条腿踏步（EMA 方差，返回正数配负权重）
-    # leg_usage_balance = RewTerm(
-    #     func=mdp.leg_usage_balance,
-    #     weight=-0.5,
-    #     params={
-    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-    #         "command_name": "base_velocity",
-    #         "ema_decay": 0.02,
-    #     },
-    # )
     # base_link 触地独立惩罚（后倒/侧翻直接标志），权重更高
     base_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,
@@ -271,7 +261,7 @@ class RewardsCfg:
 
     wheel_vel_penalty = RewTerm(
         func=mdp.wheel_vel_penalty,
-        weight=-0.3,
+        weight=-0.05,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
             "command_name": "base_velocity",

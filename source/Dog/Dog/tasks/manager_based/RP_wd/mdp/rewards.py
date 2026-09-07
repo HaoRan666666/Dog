@@ -585,6 +585,37 @@ def joint_mirror(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, mirror_joint
     reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
     return reward
 
+def leg_symmetry_l2(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg,
+    same_pairs: list[list[str]] | None = None,
+    opposite_pairs: list[list[str]] | None = None,
+) -> torch.Tensor:
+    """惩罚左右腿关节不对称，返回正数（平方和），配合负 ``weight`` 使用。
+
+    - ``same_pairs``：左右应同号的关节（HIP/KENN 俯仰），罚 ``(q_L - q_R)^2``。
+    - ``opposite_pairs``：左右应反号的关节（ABAD 侧摆），罚 ``(q_L + q_R)^2``。
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    same_pairs = same_pairs or []
+    opposite_pairs = opposite_pairs or []
+
+    if not hasattr(env, "_leg_symmetry_cache"):
+        env._leg_symmetry_cache = {}
+    cache = env._leg_symmetry_cache
+
+    reward = torch.zeros(env.num_envs, device=env.device)
+    # sign=-1 → q0 - q1（同号）；sign=+1 → q0 + q1（反号）
+    for pairs, sign in [(same_pairs, -1.0), (opposite_pairs, 1.0)]:
+        for pair in pairs:
+            key = tuple(pair)
+            if key not in cache:
+                cache[key] = [asset.find_joints(name)[0][0] for name in pair]
+            i0, i1 = cache[key]
+            diff = asset.data.joint_pos[:, i0] + sign * asset.data.joint_pos[:, i1]
+            reward += torch.square(diff)
+    return reward
+
 def feet_slide(
     env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:

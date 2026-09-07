@@ -53,8 +53,8 @@ RP_wd_CFG = ArticulationCfg(
             velocity_limit_sim=10,
             stiffness=120.0,
             damping=3.0,
-            armature=0.01,
-            friction=0.01,
+            armature=0.02,
+            friction=0.02,
             dynamic_friction=0.01,
         ),
         "WHEELS": DelayedPDActuatorCfg(

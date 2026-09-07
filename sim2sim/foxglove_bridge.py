@@ -9,10 +9,21 @@ import time
 
 import numpy as np
 
-import foxglove
 import mujoco
-from foxglove import channels as FChan
-from foxglove import messages as FMsg
+
+# foxglove-sdk 是可选依赖：未安装时不应阻塞 sim2sim 启动。
+# 用 try/except 判定，未安装时 FChan/FMsg 置 None；启用 FoxgloveBridge 时在 __init__ 里自动降级为禁用。
+try:
+    import foxglove
+    from foxglove import channels as FChan
+    from foxglove import messages as FMsg
+
+    _HAS_FOXGLOVE = True
+except ImportError:
+    foxglove = None
+    FChan = None
+    FMsg = None
+    _HAS_FOXGLOVE = False
 
 # ── MuJoCo 关节顺序 (XML body 遍历顺序) ─────────────────────────────
 # LF: ABAD, HIP, KENN, FOOT  →  mj_idx 0,1,2,3
@@ -52,6 +63,10 @@ class FoxgloveBridge:
         self._enabled = enabled
         self._server = None
         if not enabled:
+            return
+        if not _HAS_FOXGLOVE:
+            self._enabled = False
+            print("[Foxglove] 未安装 foxglove-sdk，已自动禁用 Foxglove 发布（可 `pip install foxglove-sdk` 启用）")
             return
 
         self._tf = FChan.FrameTransformChannel("/tf")
