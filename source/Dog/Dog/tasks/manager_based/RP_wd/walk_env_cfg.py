@@ -61,7 +61,7 @@ class SceneCfg(InteractiveSceneCfg):
         debug_vis=False,
         mesh_prim_paths=["/World/ground"],
     )
-   contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=16, track_air_time=True)
+   contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
    sky_light = AssetBaseCfg(
         prim_path="/World/skyLight",
         spawn=sim_utils.DomeLightCfg(
@@ -184,51 +184,51 @@ class RewardsCfg:
 #   #关节加速度
     dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
 #   #动作变化
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.02)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
     energy = RewTerm(func=mdp.energy, weight=-2e-4,
                      params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
     
-    feet_air_time = RewTerm(
-        func=mdp.feet_air_time,
-        weight=0.5,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-            "command_name": "base_velocity",
-            "target_air_time": 0.5,
-            "std": 0.15,
-        },
-    )
+    # feet_air_time = RewTerm(
+    #     func=mdp.feet_air_time,
+    #     weight=0.1,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+    #         "command_name": "base_velocity",
+    #         "threshold": 0.5,
+    #     },
+    # )
+
     # 足端落地冲击力：落地瞬间（first_contact）罚足端法向接触力峰值，让落地更柔和。
     # 注意：力是牛顿级（几十~几百 N），远大于速度级，权重需远小于速度版；量级再按 tensorboard 微调。
-    feet_landing_impact = RewTerm(
-        func=mdp.feet_landing_impact,
-        weight=-0.05,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-        },
-    )
-    # 抬腿高度目标跟踪：轮子最下方离地≈0.05m 奖励最高（不是越高越好）
-    feet_clearance = RewTerm(
-        func=mdp.feet_clearance,
-        weight=1.0,
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*FOOT_LINK"),
-            "command_name": "base_velocity",
-            "target_clearance": 0.05,
-            "std": 0.02,
-            "wheel_radius": 0.1025,
-        },
-    )
+    # feet_landing_impact = RewTerm(
+    #     func=mdp.feet_landing_impact,
+    #     weight=-0.05,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+    #     },
+    # )
+    # # 抬腿高度目标跟踪：轮子最下方离地≈0.05m 奖励最高（不是越高越好）
+    # feet_clearance = RewTerm(
+    #     func=mdp.feet_clearance,
+    #     weight=1.0,
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", body_names=".*FOOT_LINK"),
+    #         "command_name": "base_velocity",
+    #         "target_clearance": 0.05,
+    #         "std": 0.02,
+    #         "wheel_radius": 0.1025,
+    #     },
+    # )
     # 四腿离地占比均衡：惩罚只有固定两条腿踏步（EMA 方差，返回正数配负权重）
-    leg_usage_balance = RewTerm(
-        func=mdp.leg_usage_balance,
-        weight=-0.5,
-        params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-            "command_name": "base_velocity",
-            "ema_decay": 0.02,
-        },
-    )
+    # leg_usage_balance = RewTerm(
+    #     func=mdp.leg_usage_balance,
+    #     weight=-0.5,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+    #         "command_name": "base_velocity",
+    #         "ema_decay": 0.02,
+    #     },
+    # )
     # base_link 触地独立惩罚（后倒/侧翻直接标志），权重更高
     base_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,

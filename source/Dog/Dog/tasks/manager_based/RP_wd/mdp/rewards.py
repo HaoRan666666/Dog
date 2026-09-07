@@ -243,23 +243,22 @@ def joint_pos_target_l2(env: ManagerBasedRLEnv, target: float, asset_cfg: SceneE
     return torch.sum(torch.square(joint_pos - target), dim=1)
 
 def feet_air_time(
-    env: ManagerBasedRLEnv,
-    command_name: str,
-    sensor_cfg: SceneEntityCfg,
-    target_air_time: float,
-    std: float = 0.15,
+    env: ManagerBasedRLEnv, command_name: str, sensor_cfg: SceneEntityCfg, threshold: float
 ) -> torch.Tensor:
-    """目标型抬腿时间奖励：摆动腿离地时长接近 ``target_air_time`` 时奖励最高。
+    """Reward long steps taken by the feet using L2-kernel.
 
-    在足端第一次触地（first_contact）那一帧结算：离地时长 ``last_air_time`` 越接近
-    ``target_air_time``（Gaussian 核）奖励越高；离地过短或过长（一直抬着）都拿不到奖励，
-    从而抑制「某条腿一直抬着」的白嫖行为。静止（命令≈0）时不奖励。
+    This function rewards the agent for taking steps that are longer than a threshold. This helps ensure
+    that the robot lifts its feet off the ground and takes steps. The reward is computed as the sum of
+    the time for which the feet are in the air.
+
+    If the commands are small (i.e. the agent is not supposed to take a step), then the reward is zero.
     """
+    # extract the used quantities (to enable type-hinting)
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    # compute the reward
     first_contact = contact_sensor.compute_first_contact(env.step_dt)[:, sensor_cfg.body_ids]
     last_air_time = contact_sensor.data.last_air_time[:, sensor_cfg.body_ids]
-    err = last_air_time - target_air_time
-    reward = torch.sum(torch.exp(-torch.square(err / std)) * first_contact, dim=1)
+    reward = torch.sum((last_air_time - threshold) * first_contact, dim=1)
     # no reward for zero command
     reward *= torch.norm(env.command_manager.get_command(command_name)[:, :2], dim=1) > 0.1
     return reward
@@ -360,6 +359,13 @@ def leg_usage_balance(
     new_ep = (env.episode_length_buf <= 1).unsqueeze(-1)
     ema = torch.where(new_ep, in_air, ema)
     env._leg_air_usage_ema = ema.detach()
+
+    # 记录每条腿的离地占比 EMA 到 tensorboard。
+    # env.extras["log"] 会被 rl_games wrapper 重命名为 extras["episode"] 并逐条 add_scalar，
+    # key 里的 "/" 会被 tensorboard 渲染成分组（leg_air_usage 下的 LF/RF/LR/RR）。
+    # body_ids 顺序与 URDF 一致：LF, RF, LB(=后腿/Rear), RB，故标签用 LF/RF/LR/RR。
+    for i, leg in enumerate(["LF", "RF", "LR", "RR"]):
+        env.extras["log"][f"leg_air_usage/{leg}"] = ema[:, i]
 
     usage_var = ema.var(dim=1)  # [N]
     reward = usage_var * _step_command_gate(env, command_name, vy_scale, yaw_scale)
