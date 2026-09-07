@@ -118,12 +118,13 @@ class BipedRewardsCfg(FlatRewardsCfg):
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT", ".*_KENN_JOINT"])},
     )
 
-    # 前腿不外摆：罚前腿 ABAD 偏离 0，把前腿收回腰部附近而非向两侧张开。
-    # joint_deviation_l1 无条件返回 Σ|q_ABAD|（ABAD 默认=0），配合负权重驱动前腿并拢。
-    front_abad_penalty = RewTerm(
+    # 前后腿都不外摆：罚四条腿 ABAD 偏离 0，把腿收回腰部附近而非向两侧张开。
+    # joint_deviation_l1 无条件返回 Σ|q_ABAD|（ABAD 默认=0），配合负权重驱动四条腿并拢。
+    # 一个正则同时匹配 LF/RF/LB/RB 四条腿的 ABAD 关节，等价于 front+rear 各 -1.0 求和。
+    abad_penalty = RewTerm(
         func=mdp.joint_deviation_l1,
         weight=-1.0,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=["[L,R]F_ABAD_JOINT"])},
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=".*_ABAD_JOINT")},
     )
 
     # 前轮不空转：站起后前轮离地，不应无谓转动。罚前轮（LF/RF FOOT）转速。

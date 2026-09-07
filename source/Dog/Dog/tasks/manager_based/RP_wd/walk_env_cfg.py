@@ -188,15 +188,15 @@ class RewardsCfg:
     energy = RewTerm(func=mdp.energy, weight=-2e-4,
                      params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINTS)})
     
-    # feet_air_time = RewTerm(
-    #     func=mdp.feet_air_time,
-    #     weight=0.1,
-    #     params={
-    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-    #         "command_name": "base_velocity",
-    #         "threshold": 0.5,
-    #     },
-    # )
+    feet_air_time = RewTerm(
+        func=mdp.feet_air_time,
+        weight=0.1,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+            "command_name": "base_velocity",
+            "threshold": 0.5,
+        },
+    )
 
     # 足端落地冲击力：落地瞬间（first_contact）罚足端法向接触力峰值，让落地更柔和。
     # 注意：力是牛顿级（几十~几百 N），远大于速度级，权重需远小于速度版；量级再按 tensorboard 微调。
