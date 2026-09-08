@@ -8,6 +8,15 @@ USD_PATH = os.path.dirname(__file__)
 LEG_JOINTS = [".*_ABAD_JOINT", ".*_HIP_JOINT", ".*_KENN_JOINT"]
 WHEEL_JOINTS = [".*_FOOT_JOINT"]
 
+# 所有连杆名（供深度相机 raycast 目标用，让深度图能“看到”自己的腿）。
+RP_wd_LINKS = [
+    "base_link",
+    "LF_ABAD_LINK", "RF_ABAD_LINK", "LB_ABAD_LINK", "RB_ABAD_LINK",
+    "LF_HIP_LINK", "RF_HIP_LINK", "LB_HIP_LINK", "RB_HIP_LINK",
+    "LF_KENN_LINK", "RF_KENN_LINK", "LB_KENN_LINK", "RB_KENN_LINK",
+    "LF_FOOT_LINK", "RF_FOOT_LINK", "LB_FOOT_LINK", "RB_FOOT_LINK",
+]
+
 RP_wd_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{USD_PATH}/../assets/RP_wd/usd/RP_wd.usd",

@@ -15,7 +15,7 @@ from isaaclab.sensors.camera import CameraData
 from isaaclab.sensors.ray_caster import RayCasterCamera
 from isaaclab.sensors.ray_caster.ray_cast_utils import obtain_world_pose_from_view
 
-from robolab.utils.warp.raycast import raycast_mesh_grouped
+from Dog.utils.warp.raycast import raycast_mesh_grouped
 
 from . import GroupedRayCaster
 

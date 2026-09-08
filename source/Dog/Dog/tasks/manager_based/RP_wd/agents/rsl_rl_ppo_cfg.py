@@ -13,6 +13,39 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 
 
 @configclass  # 将该类标记为 Isaac Lab 的配置类，支持 YAML 序列化/反序列化和 Hydra 命令行覆写
+class RslRlPpoEncoderActorCriticCfg:
+    """带深度图像编码器的 Actor-Critic 配置（消费 dict + (N,8,H,W) 深度图观测）。
+
+    策略类指向 Dog 自带的 ``Dog.policies.encoder_actor_critic:EncoderActorCritic``，
+    完全不依赖 robolab rsl_rl fork 的 vision 专有模块（方案 B）。
+    """
+
+    class_name: str = "Dog.policies.encoder_actor_critic:EncoderActorCritic"
+    init_noise_std: float = 1.0
+    noise_std_type: str = "scalar"
+    actor_hidden_dims: list[int] = [512, 256, 128]
+    critic_hidden_dims: list[int] = [512, 256, 128]
+    actor_obs_normalization: bool = True
+    critic_obs_normalization: bool = True
+    activation: str = "elu"
+    # 走 CNN 编码器的观测项（其余标量项直接 concat 进 MLP）
+    actor_encoder_obs_groups: list[str] = ["depth_image"]
+    critic_encoder_obs_groups: list[str] = ["depth_image"]
+    # 深度编码器结构：与 parkour 一致（输入 (8, 48, 64) 多帧深度序列）
+    encoder_cfg: dict = {
+        "channels": [4],
+        "kernel_sizes": [3],
+        "strides": [1],
+        "hidden_sizes": [256, 256],
+        "output_size": 128,
+        "paddings": [1],
+        "nonlinearity": "ReLU",
+        "use_maxpool": True,
+        "last_activation": "ReLU",
+    }
+
+
+@configclass  # 将该类标记为 Isaac Lab 的配置类，支持 YAML 序列化/反序列化和 Hydra 命令行覆写
 class PPORunnerCfg(RslRlOnPolicyRunnerCfg):  # 继承 On-Policy Runner 基类，定义一个完整的 PPO 训练配置
     num_steps_per_env = 16  # 每个环境每轮采集的步数，总样本数 = num_envs × num_steps_per_env（如 4096×16=65536）
     max_iterations = 150  # 最大训练迭代次数（每轮用一批新样本做一次 PPO 更新），也是 PPO 总轮数
@@ -61,3 +94,14 @@ class PPORunnerBipedCfg(PPORunnerCfg):
     """双轮足（后腿站立）任务的 Runner 配置：与平地共享超参，仅用独立 experiment_name 区分日志目录。"""
 
     experiment_name = "RP_wd_walk_biped"
+
+
+@configclass
+class PPORunnerStairCfg(PPORunnerCfg):
+    """深度相机上台阶任务的 Runner 配置：观测改为 dict + 深度图，改用编码器策略。"""
+
+    experiment_name = "RP_wd_walk_stair"
+    # 观测组映射：policy/critic 各自只用同名观测组（台阶观测已设为分项 dict 输出）
+    obs_groups = {"policy": ["policy"], "critic": ["critic"]}
+    # 换成带深度图像编码器的 Actor-Critic（Dog 自带，不依赖 robolab rsl_rl fork）
+    policy = RslRlPpoEncoderActorCriticCfg()

@@ -7,8 +7,8 @@ from typing import Sequence
 
 from isaaclab.utils import string_to_callable
 
-from robolab.utils.buffers import AsyncCircularBuffer
-from robolab.utils.noise import ImageNoiseCfg
+from Dog.utils.buffers import AsyncCircularBuffer
+from Dog.utils.noise import ImageNoiseCfg
 
 
 class NoisyCameraMixin:  # as a subclass of SensorBase

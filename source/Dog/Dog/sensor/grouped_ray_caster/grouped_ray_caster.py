@@ -14,7 +14,7 @@ from isaaclab.sensors.ray_caster import MultiMeshRayCaster
 from isaaclab.sensors.ray_caster.ray_cast_utils import obtain_world_pose_from_view
 from isaaclab.sim.views import XformPrimView
 
-from robolab.utils.warp.raycast import raycast_mesh_grouped
+from Dog.utils.warp.raycast import raycast_mesh_grouped
 
 if TYPE_CHECKING:
     from .grouped_ray_caster_cfg import GroupedRayCasterCfg

@@ -190,11 +190,11 @@ class RewardsCfg:
     
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
-        weight=0.1,
+        weight=0.5,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
             "command_name": "base_velocity",
-            "threshold": 0.5,
+            "threshold": 0.6,
         },
     )
 
@@ -219,6 +219,7 @@ class RewardsCfg:
     #         "wheel_radius": 0.1025,
     #     },
     # )
+    
     # base_link 触地独立惩罚（后倒/侧翻直接标志），权重更高
     base_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,

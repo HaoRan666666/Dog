@@ -60,6 +60,12 @@ import torch
 
 from rsl_rl.runners import DistillationRunner, OnPolicyRunner
 
+from Dog.policies.rsl_rl_compat import patch_rollout_storage
+
+# 官方 rsl_rl 的 RolloutStorage 不支持嵌套 dict 观测（concatenate_terms=False），
+# 打补丁让台阶任务的深度图观测能正常写入 rollout 缓冲（幂等）。
+patch_rollout_storage()
+
 from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
