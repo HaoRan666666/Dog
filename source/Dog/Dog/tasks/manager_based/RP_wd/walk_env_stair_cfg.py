@@ -58,7 +58,7 @@ class StairSceneCfg(TerrainSceneCfg):
     depth_camera = NoisyGroupedRayCasterCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         offset=NoisyGroupedRayCasterCameraCfg.OffsetCfg(
-            pos=(0.2, 0.0, 0.1),
+            pos=(0.27, 0.0, 0.07),
             rot=(0.9659258, 0.0, 0.2588190, 0.0),  # 绕 +Y 转 +30°（低头）
             convention="world",
         ),
