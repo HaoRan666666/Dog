@@ -52,9 +52,9 @@ class BipedCommandsCfg:
             ang_vel_z=(-1.0, 1.0),
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.5, 1.5),
+            lin_vel_x=(-2.5, 2.5),
             lin_vel_y=(0.0, 0.0),
-            ang_vel_z=(-1.0, 1.0),
+            ang_vel_z=(-1.5, 1.5),
         ),
     )
 
