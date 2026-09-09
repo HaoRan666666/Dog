@@ -122,9 +122,6 @@ class TerrainRewardsCfg(RewardsCfg):
 
     # ── 足端步态奖励：暂移除（地形爬坡不需要正常踏步步态），后续需要再加 ──
     feet_air_time = None
-    feet_landing_impact = None
-    feet_clearance = None
-    leg_usage_balance = None
 
 @configclass
 class RP_wd_Walk_Terrain_Env(RP_wd_Walk_Flat_Env):
