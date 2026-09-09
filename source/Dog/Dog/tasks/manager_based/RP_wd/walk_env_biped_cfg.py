@@ -64,12 +64,14 @@ class BipedCommandsCfg:
 class BipedRewardsCfg(FlatRewardsCfg):
     """奖励：继承平地，但把机体系「抬腿/转向/竖直速度」相关项全部移除（置 None），换成双轮足自平衡所需。"""
 
-    # 前腿任意连杆（ABAD/HIP/KENN/FOOT）触地 → 重罚。
+    # 前腿任意连杆（ABAD/HIP/KENN/FOOT）触地 → 惩罚。
     # 四腿站立时前轮持续着地，会一直吃到这条惩罚；策略要消除它只能把前腿抬起来，
-    # 用两条后腿 + 后轮支撑行走。权重与 base_contact_penalty 相当，可再加大。
+    # 用两条后腿 + 后轮支撑行走。权重降到 -5（原 -20 从 episode 一开始就重罚天然触地的
+    # 前脚，逼前腿在后腿还没站稳时就急速甩开），留给 front_hip_tuck/front_kenn_tuck
+    # 的站立门控去把「抬前腿」和「站起来」两个时序解耦。
     front_contact_penalty = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-20.0,
+        weight=-5.0,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names="[L,R]F_.*_LINK"),
             "threshold": 1.0,
@@ -146,8 +148,10 @@ class BipedRewardsCfg(FlatRewardsCfg):
     # 目标角（HIP≈2.35, KENN≈-1.6）由 URDF 正运动学验证：此时前轮（FOOT_LINK）落在
     # 机体系 (x≈-0.03, y≈0.21, z≈-0.005)（原点 base_link）附近，即贴着腰侧、与腰同高，
     # 且离地（不会触发 front_contact_penalty）。只作用于 LF/RF，不影响支撑用的后腿。
+    # 用 gated_joint_pos_target_l2 加「站立进度」门控：机身还平趴时门控≈0，前腿目标角
+    # 奖励不生效，避免跟后腿起身抢跑；机身接近竖直后门控→1，才开始把前腿往回收。
     front_hip_tuck = RewTerm(
-        func=mdp.joint_pos_target_l2,
+        func=mdp.gated_joint_pos_target_l2,
         weight=-1.0,
         params={
             "target": 2.35,
@@ -155,7 +159,7 @@ class BipedRewardsCfg(FlatRewardsCfg):
         },
     )
     front_kenn_tuck = RewTerm(
-        func=mdp.joint_pos_target_l2,
+        func=mdp.gated_joint_pos_target_l2,
         weight=-1.0,
         params={
             "target": -1.6,

@@ -242,6 +242,24 @@ def joint_pos_target_l2(env: ManagerBasedRLEnv, target: float, asset_cfg: SceneE
     # compute the reward
     return torch.sum(torch.square(joint_pos - target), dim=1)
 
+
+def standing_progress(env: ManagerBasedRLEnv, power: float = 2.0) -> torch.Tensor:
+    """双轮足「站立进度」门控 ∈[0,1]：四腿平趴时≈0，机身竖直（后腿站起）后→1。
+
+    ``projected_gravity_b[:, 0]`` 在机身从水平（g_x≈0）过渡到竖直（g_x≈±1）的过程中
+    单调变化，取绝对值夹到 [0,1] 即为「站立完成度」。``power`` 越大门控起效越靠后，
+    即先专心把身体立起来，立得差不多了才开始收前腿，避免站立与收腿两个目标互相打架。
+    """
+    g_x = env.scene["robot"].data.projected_gravity_b[:, 0]
+    return torch.clamp(g_x.abs(), 0.0, 1.0) ** power
+
+
+def gated_joint_pos_target_l2(
+    env: ManagerBasedRLEnv, target: float, asset_cfg: SceneEntityCfg, gate_power: float = 2.0
+) -> torch.Tensor:
+    """``joint_pos_target_l2`` 乘上 ``standing_progress`` 门控：只在接近站立后才拉关节角。"""
+    return joint_pos_target_l2(env, target, asset_cfg) * standing_progress(env, gate_power)
+
 def feet_air_time(
     env: ManagerBasedRLEnv, command_name: str, sensor_cfg: SceneEntityCfg, threshold: float
 ) -> torch.Tensor:
