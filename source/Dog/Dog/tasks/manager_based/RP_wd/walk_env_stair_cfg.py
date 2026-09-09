@@ -75,7 +75,7 @@ class StairSceneCfg(TerrainSceneCfg):
         ),
         # 地面 + 机器人自身连杆（让深度图能「看到」自己的腿，避免盲区/自遮挡信息丢失）
         mesh_prim_paths=["/World/ground", *get_link_prim_targets(RP_wd_LINKS)],
-        debug_vis=True,
+        debug_vis=False,
         # 仿真→真实深度退化（噪声 pipeline，作用于归一化前的原始 metric 深度）
         noise_pipeline={
             # --- 保守增强（作用于原始 metric 深度）---

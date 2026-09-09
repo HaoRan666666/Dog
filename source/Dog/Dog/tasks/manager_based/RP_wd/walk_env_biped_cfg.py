@@ -142,6 +142,27 @@ class BipedRewardsCfg(FlatRewardsCfg):
         },
     )
 
+    # 前腿收腰：把前腿 HIP/KENN 拉向折叠目标角，让前轮贴着腰部侧面而不是向前伸出。
+    # 目标角（HIP≈2.35, KENN≈-1.6）由 URDF 正运动学验证：此时前轮（FOOT_LINK）落在
+    # 机体系 (x≈-0.03, y≈0.21, z≈-0.005)（原点 base_link）附近，即贴着腰侧、与腰同高，
+    # 且离地（不会触发 front_contact_penalty）。只作用于 LF/RF，不影响支撑用的后腿。
+    front_hip_tuck = RewTerm(
+        func=mdp.joint_pos_target_l2,
+        weight=-1.0,
+        params={
+            "target": 2.35,
+            "asset_cfg": SceneEntityCfg("robot", joint_names="[L,R]F_HIP_JOINT"),
+        },
+    )
+    front_kenn_tuck = RewTerm(
+        func=mdp.joint_pos_target_l2,
+        weight=-1.0,
+        params={
+            "target": -1.6,
+            "asset_cfg": SceneEntityCfg("robot", joint_names="[L,R]F_KENN_JOINT"),
+        },
+    )
+
     # 左右腿镜像对称：HIP/KENN（俯仰）左右同号、ABAD（侧摆）左右反号，前后腿都约束。
     leg_symmetry = RewTerm(
         func=mdp.leg_symmetry_l2,
