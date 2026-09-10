@@ -39,6 +39,11 @@ class GamepadSimple:
         except BlockingIOError:
             pass
 
+    @property
+    def buttons(self) -> list:
+        """当前按键状态 (调用 advance() 后即为最新一帧)。"""
+        return self._buttons
+
     def advance(self) -> tuple:
         """每帧调用，返回 (vx, vy, wz) 速度指令。"""
         self._poll()

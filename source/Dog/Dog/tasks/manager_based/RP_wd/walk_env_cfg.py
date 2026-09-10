@@ -190,11 +190,11 @@ class RewardsCfg:
     
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
-        weight=0.5,
+        weight=1.5,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
             "command_name": "base_velocity",
-            "threshold": 0.6,
+            "threshold": 1.0,
         },
     )
 
@@ -260,17 +260,17 @@ class RewardsCfg:
               },
     ) 
 
-    # wheel_vel_penalty = RewTerm(
-    #     func=mdp.wheel_vel_penalty,
-    #     weight=-0.05,
-    #     params={
-    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-    #         "command_name": "base_velocity",
-    #         "velocity_threshold": 0.5,
-    #         "command_threshold": 0.1,
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names=".*FOOT_JOINT"),
-    #     },
-    # )
+    wheel_vel_penalty = RewTerm(
+        func=mdp.wheel_vel_penalty,
+        weight=-0.05,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
+            "command_name": "base_velocity",
+            "velocity_threshold": 0.5,
+            "command_threshold": 0.1,
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*FOOT_JOINT"),
+        },
+    )
 
 
 #     trotting_rew= RewTerm(

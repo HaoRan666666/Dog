@@ -76,10 +76,10 @@ class TerrainCommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.5, 1.5), lin_vel_y=(-0.8, 0.8), ang_vel_z=(-1, 1), heading=(-math.pi, math.pi)
+            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1, 1), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.5, 1.5), lin_vel_y=(-0.8, 0.8), ang_vel_z=(-1, 1)
+            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1, 1)
         ),
     )
 

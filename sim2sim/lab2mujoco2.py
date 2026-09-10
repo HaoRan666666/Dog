@@ -155,12 +155,24 @@ def main():
     from collections import deque
 
     parser = argparse.ArgumentParser(description="Isaac Lab→MuJoCo sim2sim 部署")
-    parser.add_argument("--ckpt", type=str, default="/home/rp/model_server/rpwd_0816_platform/exported/policy.pt",
-                        help="TorchScript 策略路径 (由 play.py 自动导出到 exported/policy.pt)")
+    parser.add_argument("--ckpt", type=str,
+                        default="/home/rp/dog/Dog/logs/rsl_rl/RP_wd_walk_flat/2026-09-08_20-31-40/exported/policy.pt",
+                        help="平地模型 (默认模型) TorchScript 策略路径")
+    parser.add_argument("--biped-ckpt", type=str,
+                        default="/home/rp/rpwd_model/rpwd_biped_policy/policy.pt",
+                        help="双轮站立模型 TorchScript 策略路径 (手柄 Y 键切换)")
+    parser.add_argument("--platform-ckpt", type=str,
+                        default="/home/rp/model_server/rpwd_platform_save_success/exported/policy.pt",
+                        help="高台模型 TorchScript 策略路径 (手柄 Y 键切换)")
+    parser.add_argument("--step-ckpt", type=str,
+                        default="/home/rp/model_server/rpwd_step_success/exported/policy.pt",
+                        help="台阶模型 TorchScript 策略路径 (手柄 Y 键切换)")
     parser.add_argument("--input", type=str, default="keyboard", choices=["keyboard", "gamepad"],
                         help="输入设备: keyboard (零指令站立) 或 gamepad")
     parser.add_argument("--device", type=str, default="/dev/input/js0",
                         help="手柄设备路径")
+    parser.add_argument("--y-button", type=int, default=3,
+                        help="手柄 Y 键在 /dev/input/jsX 中的按键编号 (若切换无效，参考运行时打印的按键编号校准)")
     parser.add_argument("--vx", type=float, default=2.0, help="前进灵敏度")
     parser.add_argument("--vy", type=float, default=2.0, help="横移灵敏度")
     parser.add_argument("--wz", type=float, default=2.0, help="转向灵敏度")
@@ -173,15 +185,34 @@ def main():
     args = parser.parse_args()
 
     # ── 加载策略 (TorchScript 模型，已内置归一化) ─────────────────
-    ckpt_path = args.ckpt
-    try:
-        policy = torch.jit.load(ckpt_path)
-        policy.eval()
-        policy.to(device)
-        print(f"策略加载成功: {ckpt_path}")
-    except Exception as e:
-        print(f"策略加载失败: {e}")
+    # 所有模型都提前加载好，手柄 Y 键切换时直接换用已加载的模块，无需重新读盘。
+    # 切换顺序按此列表循环：flat → biped → platform → step → flat → ...
+    MODEL_ORDER = ["flat", "biped", "platform", "step"]
+    model_paths = {
+        "flat": args.ckpt,
+        "biped": args.biped_ckpt,
+        "platform": args.platform_ckpt,
+        "step": args.step_ckpt,
+    }
+    policies = {}
+    for name in MODEL_ORDER:
+        path = model_paths[name]
+        try:
+            p = torch.jit.load(path)
+            p.eval()
+            p.to(device)
+            policies[name] = p
+            print(f"策略加载成功 [{name}]: {path}")
+        except Exception as e:
+            policies[name] = None
+            print(f"策略加载失败 [{name}] ({path}): {e}")
+
+    if policies["flat"] is None:
+        print("默认模型 [flat] 加载失败，无法启动")
         exit()
+
+    active_model = "flat"
+    policy = policies[active_model]
 
     # ── 控制频率: dt=0.0025, decimation=8 → 50Hz (0.02s) ──
     sim_dt = m.opt.timestep
@@ -207,13 +238,14 @@ def main():
     # ── 输入设备 ──────────────────────────────────────────────────
     if args.input == "gamepad":
         input_device = GamepadSimple(vx=args.vx, vy=args.vy, wz=args.wz, dev=args.device)
-        print("手柄控制: 左摇杆移动, 右摇杆左右转向")
+        print("手柄控制: 左摇杆移动, 右摇杆左右转向, Y 键循环切换 平地/双轮/高台/台阶 模型")
     else:
         input_device = None
         print("键盘模式: 零指令站立 (机器人原地维持平衡)")
 
     actions = torch.zeros(16, device=device, dtype=torch.float32)
     history = deque(maxlen=3)
+    prev_y_state = 0
     print("策略启动")
 
     # ── Foxglove 数据发布 ─────────────────────────────────────────
@@ -234,8 +266,32 @@ def main():
         while viewer.is_running():
             if input_device is not None:
                 raw = input_device.advance()
+
+                # Y 键边沿触发：按 MODEL_ORDER 循环切换模型，跳过加载失败的
+                y_state = 0
+                if 0 <= args.y_button < len(input_device.buttons):
+                    y_state = input_device.buttons[args.y_button]
+                if y_state == 1 and prev_y_state == 0:
+                    cur_idx = MODEL_ORDER.index(active_model)
+                    for step in range(1, len(MODEL_ORDER) + 1):
+                        candidate = MODEL_ORDER[(cur_idx + step) % len(MODEL_ORDER)]
+                        if policies[candidate] is not None:
+                            active_model = candidate
+                            policy = policies[active_model]
+                            # 各模型的观测历史/动作含义不同，切换时清空避免污染
+                            actions = torch.zeros(16, device=device, dtype=torch.float32)
+                            history.clear()
+                            print(f"切换模型 → {active_model}")
+                            break
+                    else:
+                        print("切换失败：没有其他已成功加载的模型")
+                prev_y_state = y_state
+
                 # 训练约定: +wz=逆时针 (右手定则), 手柄摇杆原始输出已取反 → 直接使用
                 commands = (raw[0], raw[1], raw[2])
+                if active_model == "biped":
+                    # 双轮任务训练时 lin_vel_y 指令范围固定为 (0,0)，部署时同步禁用左右横移
+                    commands = (commands[0], 0.0, commands[2])
             else:
                 commands = (0.0, 0.0, 0.0)
 
