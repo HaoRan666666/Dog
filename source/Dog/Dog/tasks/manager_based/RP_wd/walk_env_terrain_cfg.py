@@ -76,10 +76,10 @@ class TerrainCommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.5), lin_vel_y=(-0.5, 1.0), ang_vel_z=(-1, 1), heading=(-math.pi, math.pi)
+            lin_vel_x=(-0.3, 1.5), lin_vel_y=(-0.2, 0.5), ang_vel_z=(-1, 1), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.0, 1.5), lin_vel_y=(-0.5, 1.0), ang_vel_z=(-1, 1)
+            lin_vel_x=(-0.3, 1.5), lin_vel_y=(-0.2, 0.5), ang_vel_z=(-1, 1)
         ),
     )
 
@@ -100,12 +100,19 @@ class TerrainRewardsCfg(RewardsCfg):
 
     joint_pos=None
 
+    # 台阶上转向指令的追踪权重调低（避免为了转向牺牲爬升）
+    track_ang_vel_z_exp = RewTerm(
+        func=mdp.track_ang_vel_z_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+    )
+    # 台阶上动作抖动惩罚加大（深度图噪声大，抑制策略输出高频抖动）
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.03)
+
     # ── 降权重：台阶上允许更大关节偏移，但要保留一定约束 ──
 
     # ABAD 单独加重惩罚，防止外展抬腿
     joint_pos_abad = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.2,
+        weight=-0.4,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
             "stand_still_scale": 5.0,

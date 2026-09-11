@@ -268,6 +268,15 @@ def main():
     term = env.unwrapped.command_manager._terms["base_velocity"]
     term.cfg.heading_command = False
 
+    # ── 关闭随机"站定"覆盖 ───────────────────────────────────────
+    # 训练时 rel_standing_envs>0 会让 _update_command() 每步强制把
+    # is_standing_env=True 的环境速度指令清零（用于学习零速站定）。
+    # Play 模式下每次 resample（resampling_time_range）都有 rel_standing_envs
+    # 的概率触发，导致接下来整个 resample 周期内键盘/手柄指令被静默清零，
+    # 表现为「有时候给指令机器人完全不动」。这里强制常驻关闭。
+    term.cfg.rel_standing_envs = 0.0
+    term.is_standing_env[:] = False
+
     # ── 扭矩记录 ──────────────────────────────────────────────────
     joint_names = list(env.unwrapped.scene["robot"].data.joint_names)
     torque_log = [] if args_cli.record_torque else None
