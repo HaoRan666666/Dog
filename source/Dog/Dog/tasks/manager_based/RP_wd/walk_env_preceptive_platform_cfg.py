@@ -1,20 +1,23 @@
-"""RP_wd 深度相机上台阶任务配置。
+"""RP_wd 深度相机上高台（platform）任务配置。
 
 任务描述：
-    在 ``walk_env_terrain_cfg``（地形行走）基础上，参考 parkour 的深度相机 pipeline，
-    新增一台前视下倾的深度相机，把「带噪声 + 历史缓存的延迟多帧深度序列」作为观测
-    同时喂给 policy 与 critic，让策略学会「用深度相机看台阶」爬升。
+    在 ``walk_env_platform_cfg``（高台/平台地形行走）基础上，参考 ``walk_env_stair_cfg``
+    的深度相机 pipeline，新增一台前视下倾的深度相机，把「带噪声 + 历史缓存的延迟多帧深度
+    序列」作为观测同时喂给 policy 与 critic，让策略学会「用深度相机看高台」攀爬。
 
-与 ``walk_env_terrain_cfg`` 的区别：
+与 ``walk_env_platform_cfg`` 的区别：
     - 场景：多一台 ``depth_camera``（NoisyGroupedRayCasterCamera，挂 base_link，前视下倾），
-      参考 parkour 深度相机配置：加噪声 pipeline + 37 帧历史缓存 + 自身连杆 raycast 目标。
+      与台阶任务一致：加噪声 pipeline + 37 帧历史缓存 + 自身连杆 raycast 目标。
     - 观测：policy 与 critic 的深度图改为 ``delayed_visualizable_image``（延迟多帧深度序列），
       观测组从「扁平向量」(concatenate_terms=True) 改为「分项 dict」(concatenate_terms=False)。
-    - 命令 / 奖励 / 终止 / 课程 / 复位 全部继承地形配置。
+    - 指令 / 终止 / 课程 / 复位 / 平坦度扫描（flatness_scanner）全部继承平台配置。
+    - 奖励：在平台奖励基础上新增前腿 ABAD_LINK / HIP_LINK 撞侧壁惩罚
+      （``front_abad_hip_contact_penalty``），引导策略用深度图提前规划抬腿/起跳，
+      而不是撞上台沿再蹭上去。
 
 注意：观测改为 dict + 图像后，需要 vision-capable 的策略网络（RSL-RL 默认 MLP 只能消费
 扁平向量，不能直接消费 dict + (N,8,H,W) 图像）。策略网络需自行拼接标量项并加 CNN/Transformer
-处理深度序列。
+处理深度序列（参考 ``PPORunnerStairCfg`` 用的 ``RslRlPpoEncoderActorCriticCfg``）。
 """
 
 from isaaclab.devices import DevicesCfg
@@ -41,27 +44,32 @@ from Dog.utils.noise import (
 
 from . import mdp
 from .walk_env_cfg import LEG_JOINTS
-from .walk_env_terrain_cfg import (
-    RP_wd_Walk_Terrain_Env,
-    TerrainSceneCfg,
-    TerrainObservationsCfg,
-    TerrainRewardsCfg,
+from .walk_env_platform_cfg import (
+    RP_wd_Walk_Platform_Env,
+    PlatformSceneCfg,
+    PlatformObservationsCfg,
+    PlatformRewardsCfg,
 )
 
 
 @configclass
-class StairSceneCfg(TerrainSceneCfg):
-    """台阶场景：继承地形场景，新增前视下倾的深度相机。"""
+class PlatformDepthSceneCfg(PlatformSceneCfg):
+    """高台深度场景：继承平台场景，新增前视下倾的深度相机。"""
 
-    # 深度相机：挂 base_link，前视下倾 ~45°，看前方台阶。
+    # 深度相机：挂 base_link，前视上仰（与台阶任务的下倾相反）。
     # 相机光轴为 +X（pinhole_camera_pattern 输出 x forward / y left / z up），
-    # 故用 convention="world"（forward=+X, up=+Z）。rot 绕 +Y 转 +45° 即「低头」。
+    # 故用 convention="world"（forward=+X, up=+Z）。rot 绕 +Y 转 +角度=低头，转 -角度=仰头。
+    # 竖直 FOV = 2*atan((vertical_aperture/2)/focal_length)
+    #          = 2*atan((20.955*48/64/2)/24) ≈ 36.26°，半视场角 ≈ 18.13°。
+    # 高台地形箱体边缘高于机器人 base，需要仰视才能看到台面/台沿，
+    # 故令俯仰角 = -半视场角，使视场下边界（最靠近水平线的那条射线）正好与地面平行，
+    # 整个视场向上偏转，避免视场浪费在近处地面、优先看清前方高台。
     # 姿态为占位值，需在 viewer 里验证视角后再微调 pos/rot。
     depth_camera = NoisyGroupedRayCasterCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         offset=NoisyGroupedRayCasterCameraCfg.OffsetCfg(
             pos=(0.29, 0.0, 0.07),
-            rot=(0.9238795, 0.0, 0.3826834, 0.0),  # 绕 +Y 转 +45°（低头）
+            rot=(0.9875108, 0.0, -0.1575512, 0.0),  # 绕 +Y 转 -18.13°（仰头，= 半视场角）
             convention="world",
         ),
         data_types=["distance_to_image_plane"],
@@ -128,8 +136,8 @@ class StairSceneCfg(TerrainSceneCfg):
 
 
 @configclass
-class StairObservationsCfg(TerrainObservationsCfg):
-    """台阶观测：标量项保留 history_length=3，深度图改为延迟多帧序列；分项 dict 输出。
+class PlatformDepthObservationsCfg(PlatformObservationsCfg):
+    """高台深度观测：标量项保留 history_length=3，深度图改为延迟多帧序列；分项 dict 输出。
 
     ``concatenate_terms=False``：观测以 dict 返回（标量项 + 深度图分开），
     由 vision-capable 策略网络分别处理。标量项各自叠加 3 步历史并展平；
@@ -137,7 +145,7 @@ class StairObservationsCfg(TerrainObservationsCfg):
     """
 
     @configclass
-    class PolicyCfg(TerrainObservationsCfg.PolicyCfg):
+    class PolicyCfg(PlatformObservationsCfg.PolicyCfg):
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2),
             history_length=3, flatten_history_dim=True,
@@ -181,7 +189,7 @@ class StairObservationsCfg(TerrainObservationsCfg):
             self.history_length = None
 
     @configclass
-    class CriticCfg(TerrainObservationsCfg.CriticCfg):
+    class CriticCfg(PlatformObservationsCfg.CriticCfg):
         base_lin_vel = ObsTerm(
             func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1),
             history_length=3, flatten_history_dim=True,
@@ -238,35 +246,46 @@ class StairObservationsCfg(TerrainObservationsCfg):
 
 
 @configclass
-class StairRewardsCfg(TerrainRewardsCfg):
-    """台阶（深度相机）任务专属奖励：用地形高度扫描（特权信息）惩罚轮子踩在棱边附近，
-    逼策略学会用深度相机提前规划落脚点，而不是靠触感被动纠正。"""
+class PlatformDepthRewardsCfg(PlatformRewardsCfg):
+    """高台深度奖励：继承平台奖励，新增前腿 ABAD_LINK / HIP_LINK 撞侧壁惩罚。
 
-    feet_near_edge = RewTerm(
-        func=mdp.feet_near_edge,
-        weight=-0.5,
+    前腿（LF/RF）ABAD_LINK 或 HIP_LINK 触地/触壁都意味着整条腿（从髋部起）撞上了
+    高台侧壁——说明策略没有提前根据深度图规划好抬腿/起跳时机。单独给这两条连杆
+    更强的惩罚（叠加在 ``leg_contact_penalty`` 之上），专门引导「深度图看到台阶
+    → 提前抬腿越过」而不是「先撞上去再蹭上去」。
+    """
+
+    front_abad_hip_contact_penalty = RewTerm(
+        func=mdp.terrain_split_reward,
+        weight=1.0,
         params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*FOOT_LINK"),
-            "height_scanner_cfg": SceneEntityCfg("height_scanner"),
-            "edge_radius": 0.1,
-            "edge_height_threshold": 0.04,
+            "base_func": mdp.undesired_contacts,
+            "pit_scale": -10.0,   # 爬台时：撞侧壁直接重罚，逼策略提前抬腿
+            "plane_scale": -20.0,  # 平地：正常不该发生，同样严格约束
+            "base_params": {
+                "sensor_cfg": SceneEntityCfg(
+                    "contact_forces",
+                    body_names=["LF_ABAD_LINK", "RF_ABAD_LINK", "LF_HIP_LINK", "RF_HIP_LINK"],
+                ),
+                "threshold": 1.0,
+            },
+            "pit_col_threshold": 7,
         },
     )
 
 
 @configclass
-class RP_wd_Walk_Stair_Env(RP_wd_Walk_Terrain_Env):
-    """RP_wd 深度相机上台阶训练环境（框架同地形，仅场景加相机、观测加深度图、奖励加棱边惩罚）。"""
+class RP_wd_Walk_Platform_Depth_Env(RP_wd_Walk_Platform_Env):
+    """RP_wd 深度相机上高台训练环境（框架同平台，仅场景加相机、观测加深度图、奖励加撞壁惩罚）。"""
 
-    scene: StairSceneCfg = StairSceneCfg(num_envs=2048, env_spacing=4.0)
-    observations: StairObservationsCfg = StairObservationsCfg()
-    rewards: StairRewardsCfg = StairRewardsCfg()
+    scene: PlatformDepthSceneCfg = PlatformDepthSceneCfg(num_envs=2048, env_spacing=4.0)
+    observations: PlatformDepthObservationsCfg = PlatformDepthObservationsCfg()
+    rewards: PlatformDepthRewardsCfg = PlatformDepthRewardsCfg()
 
 
 @configclass
-class RP_wd_Walk_Stair_Env_Play(RP_wd_Walk_Stair_Env):
-    """台阶 Play 环境（键盘遥控，单环境，开深度相机 debug_vis 验证占位姿态）。"""
+class RP_wd_Walk_Platform_Depth_Env_Play(RP_wd_Walk_Platform_Depth_Env):
+    """高台深度 Play 环境（键盘遥控，单环境，开深度相机 debug_vis 验证占位姿态）。"""
 
     def __post_init__(self) -> None:
         self.scene.num_envs = 1
@@ -280,8 +299,14 @@ class RP_wd_Walk_Stair_Env_Play(RP_wd_Walk_Stair_Env):
 
         self.observations.policy.enable_corruption = False
 
-        # 保留全部地形（上/下台阶 + 平地），便于遥控验证深度相机视角
-        self.scene.terrain.max_init_terrain_level = 15
+        # 从低难度开始（避免出生在高台阶上）
+        self.scene.terrain.max_init_terrain_level = 0
+
+        # Play 模式保留高台 + 平地，便于遥控验证深度相机视角
+        self.scene.terrain.terrain_generator.sub_terrains = {
+            k: v for k, v in self.scene.terrain.terrain_generator.sub_terrains.items()
+            if k in ("platform", "plane")
+        }
         # 开相机调试可视化：显示相机 frame 与射线命中点（红球），用于验证占位姿态
         self.scene.depth_camera.debug_vis = True
 
@@ -294,4 +319,5 @@ class RP_wd_Walk_Stair_Env_Play(RP_wd_Walk_Stair_Env):
         })
 
         self.curriculum = None
-        self.terminations.base_contact = None
+        # 关闭 base 接触终止，爬台时容易蹭到平台边缘
+        self.terminations.base_fallen = None

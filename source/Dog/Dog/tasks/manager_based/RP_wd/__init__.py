@@ -120,3 +120,25 @@ gym.register(
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerStairCfg",
     },
 )
+
+# RP_wd 深度相机上高台/平台（训练）
+gym.register(
+    id="RP_wd_Walk_Platform_Depth",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.walk_env_preceptive_platform_cfg:RP_wd_Walk_Platform_Depth_Env",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerPlatformDepthCfg",
+    },
+)
+
+# RP_wd 深度相机上高台/平台（Play）
+gym.register(
+    id="RP_wd_Walk_Platform_Depth_Play",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.walk_env_preceptive_platform_cfg:RP_wd_Walk_Platform_Depth_Env_Play",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerPlatformDepthCfg",
+    },
+)

@@ -13,7 +13,7 @@ from collections.abc import Callable
 from isaaclab.assets import Articulation
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils.math import wrap_to_pi
-from isaaclab.sensors import ContactSensor
+from isaaclab.sensors import ContactSensor, RayCaster
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import ManagerTermBase
 from isaaclab.assets import RigidObject
@@ -388,6 +388,47 @@ def leg_usage_balance(
     usage_var = ema.var(dim=1)  # [N]
     reward = usage_var * _step_command_gate(env, command_name, vy_scale, yaw_scale)
     return reward
+
+
+def feet_near_edge(
+    env: ManagerBasedRLEnv,
+    sensor_cfg: SceneEntityCfg,
+    asset_cfg: SceneEntityCfg,
+    height_scanner_cfg: SceneEntityCfg,
+    edge_radius: float = 0.12,
+    edge_height_threshold: float = 0.04,
+) -> torch.Tensor:
+    """惩罚正在承重的轮子落在台阶棱边附近（局部地形高度落差过大）。
+
+    用 height_scanner 的高度扫描网格（特权信息，不进策略观测）在轮子周围 edge_radius
+    半径内取样，若该邻域内最高点与最低点落差超过 edge_height_threshold，视为「棱边」。
+    只惩罚正在接触地面的轮子（正在承重/踩在棱边上不稳），悬空摆动经过棱边上方不罚——
+    逼迫策略靠深度相机提前判断落脚点，而不是靠触感被动纠正。
+    """
+    asset: Articulation = env.scene[asset_cfg.name]
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    height_scanner: RayCaster = env.scene.sensors[height_scanner_cfg.name]
+
+    foot_xy = asset.data.body_link_pos_w[:, asset_cfg.body_ids, :2]  # [N, n_feet, 2]
+    grid_xyz = height_scanner.data.ray_hits_w  # [N, num_rays, 3]
+    grid_xy = grid_xyz[:, :, :2]
+    grid_z = grid_xyz[:, :, 2]
+
+    dist2 = torch.sum(
+        (foot_xy.unsqueeze(2) - grid_xy.unsqueeze(1)) ** 2, dim=-1
+    )  # [N, n_feet, num_rays]
+    near_mask = dist2 < edge_radius**2
+    any_near = near_mask.any(dim=-1)  # [N, n_feet]
+
+    z_expand = grid_z.unsqueeze(1).expand(-1, foot_xy.shape[1], -1)
+    z_max = torch.where(near_mask, z_expand, torch.full_like(z_expand, -1e4)).amax(dim=-1)
+    z_min = torch.where(near_mask, z_expand, torch.full_like(z_expand, 1e4)).amin(dim=-1)
+    height_range = (z_max - z_min).clamp(min=0.0)
+
+    is_edge = any_near & (height_range > edge_height_threshold)  # [N, n_feet]
+    in_contact = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids] > 0.0
+
+    return torch.sum((is_edge & in_contact).float(), dim=-1)
 
 
 class GaitReward(ManagerTermBase):

@@ -105,3 +105,14 @@ class PPORunnerStairCfg(PPORunnerCfg):
     obs_groups = {"policy": ["policy"], "critic": ["critic"]}
     # 换成带深度图像编码器的 Actor-Critic（Dog 自带，不依赖 robolab rsl_rl fork）
     policy = RslRlPpoEncoderActorCriticCfg()
+
+
+@configclass
+class PPORunnerPlatformDepthCfg(PPORunnerCfg):
+    """深度相机上高台任务的 Runner 配置：观测改为 dict + 深度图，改用编码器策略。"""
+
+    experiment_name = "RP_wd_walk_platform_depth"
+    # 观测组映射：policy/critic 各自只用同名观测组（高台深度观测已设为分项 dict 输出）
+    obs_groups = {"policy": ["policy"], "critic": ["critic"]}
+    # 换成带深度图像编码器的 Actor-Critic（Dog 自带，不依赖 robolab rsl_rl fork）
+    policy = RslRlPpoEncoderActorCriticCfg()

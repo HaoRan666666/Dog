@@ -190,7 +190,7 @@ class RewardsCfg:
     
     feet_air_time = RewTerm(
         func=mdp.feet_air_time,
-        weight=1.0,
+        weight=1.5,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*FOOT_LINK"),
             "command_name": "base_velocity",
