@@ -79,7 +79,7 @@ class CommandsCfg: #MDP（马尔可夫决策过程）指令生成器的配置类
     base_velocity = mdp.UniformLevelVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(5.0, 5.0),
-        rel_standing_envs=0.1,
+        rel_standing_envs=0.01,
         rel_heading_envs=1.0,
         heading_command=True,
         heading_control_stiffness=0.5,

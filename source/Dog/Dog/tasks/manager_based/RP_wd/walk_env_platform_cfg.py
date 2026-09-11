@@ -96,7 +96,7 @@ class PlatformCommandsCfg:
     base_velocity = mdp.TerrainSplitVelocityCommandCfg(
         asset_name="robot",
         resampling_time_range=(8.0, 8.0),
-        rel_standing_envs=0.001,
+        rel_standing_envs=0.01,
         rel_heading_envs=1.0,          # 平地全部开启 heading
         heading_command=True,           # 开启 heading（仅平地生效）
         heading_control_stiffness=0.5,
