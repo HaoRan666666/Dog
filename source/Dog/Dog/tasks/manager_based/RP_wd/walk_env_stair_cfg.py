@@ -51,15 +51,15 @@ from .walk_env_terrain_cfg import (
 class StairSceneCfg(TerrainSceneCfg):
     """台阶场景：继承地形场景，新增前视下倾的深度相机。"""
 
-    # 深度相机：挂 base_link，前视下倾 ~30°，看前方台阶。
+    # 深度相机：挂 base_link，前视下倾 ~45°，看前方台阶。
     # 相机光轴为 +X（pinhole_camera_pattern 输出 x forward / y left / z up），
-    # 故用 convention="world"（forward=+X, up=+Z）。rot 绕 +Y 转 +30° 即「低头」。
+    # 故用 convention="world"（forward=+X, up=+Z）。rot 绕 +Y 转 +45° 即「低头」。
     # 姿态为占位值，需在 viewer 里验证视角后再微调 pos/rot。
     depth_camera = NoisyGroupedRayCasterCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         offset=NoisyGroupedRayCasterCameraCfg.OffsetCfg(
-            pos=(0.27, 0.0, 0.07),
-            rot=(0.9659258, 0.0, 0.2588190, 0.0),  # 绕 +Y 转 +30°（低头）
+            pos=(0.29, 0.0, 0.07),
+            rot=(0.9238795, 0.0, 0.3826834, 0.0),  # 绕 +Y 转 +45°（低头）
             convention="world",
         ),
         data_types=["distance_to_image_plane"],
