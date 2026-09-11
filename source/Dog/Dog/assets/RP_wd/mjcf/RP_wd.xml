@@ -203,6 +203,11 @@
       <freejoint name="root"/>
       <inertial pos="-0.0064993 -0.0009295 0.0021204" mass="7.4975959" fullinertia="0.0589761 0.1812866 0.2224493 0.0000143 0.000089 0.0004461"/>
       <site name="imu" pos="0 0 0"/>
+      <!-- 深度相机：pos/quat 对齐 walk_env_stair_cfg.py 里 depth_camera 的
+           offset(pos=(0.27,0,0.07), rot=(0.9659258,0,0.2588190,0), 绕+Y +30度低头)。
+           quat 已经从 Isaac 的 (X前,Y左,Z上) 约定换算成 MuJoCo 相机局部约定
+           (看向局部-Z, +Y朝上)，不需要在代码里现算。 -->
+      <camera name="depth_cam" pos="0.27 0 0.07" quat="-0.6123724 -0.3535534 0.3535534 0.6123724"/>
       <geom pos="0 0 0" group="1" contype="0" conaffinity="0" material="base_link_mat" type="mesh" mesh="base_link" />
       <geom pos="0 0 0" rgba="0.9373 0.2667 0.2667 1" group="3" contype="1" conaffinity="2" type="box" size="0.21 0.13 0.06" />
       <body name="LF_ABAD_LINK" pos="0.26915 0.07715 0.007">

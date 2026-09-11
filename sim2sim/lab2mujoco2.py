@@ -7,6 +7,11 @@ import mujoco.viewer
 import time
 import os
 
+# PyTorch CPU 默认按核数(本机14)开线程池做 intra-op 并行，对这种几十维的小 MLP
+# 来说线程调度开销远大于实际计算量：实测同一策略单步推理 14 线程要 12.8ms，
+# 单线程只要 0.02ms（差 600 倍），是之前"卡"的根本原因。单线程模型小，不需要并行。
+torch.set_num_threads(1)
+
 from foxglove_bridge import FoxgloveBridge
 from gamepad_simple import GamepadSimple
 

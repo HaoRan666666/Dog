@@ -76,10 +76,10 @@ class TerrainCommandsCfg:
         heading_control_stiffness=0.5,
         debug_vis=True,
         ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1, 1), heading=(-math.pi, math.pi)
+            lin_vel_x=(-1.0, 1.5), lin_vel_y=(-0.5, 1.0), ang_vel_z=(-1, 1), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1, 1)
+            lin_vel_x=(-1.0, 1.5), lin_vel_y=(-0.5, 1.0), ang_vel_z=(-1, 1)
         ),
     )
 
@@ -96,23 +96,16 @@ class TerrainRewardsCfg(RewardsCfg):
     """地形奖励：移除不利于爬坡/上台阶的惩罚项。"""
 
     # ── 降权重：保留基础姿态约束，防止"前倾滑行"作弊 ──
-    flat_orientation_l2 = RewTerm(
-        func=mdp.flat_orientation_l2, weight=-0.2)  # 平地 -2.5
+    flat_orientation_l2 = None
+
+    joint_pos=None
 
     # ── 降权重：台阶上允许更大关节偏移，但要保留一定约束 ──
-    joint_pos_hip_kenn = RewTerm(
-        func=mdp.joint_position_penalty,
-        weight=-0.1,
-        params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_HIP_JOINT", ".*_KENN_JOINT"]),
-            "stand_still_scale": 5.0,
-            "velocity_threshold": 0.3,
-        },
-    )
+
     # ABAD 单独加重惩罚，防止外展抬腿
     joint_pos_abad = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.4,
+        weight=-0.2,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
             "stand_still_scale": 5.0,
@@ -122,12 +115,6 @@ class TerrainRewardsCfg(RewardsCfg):
 
     # ── 足端步态奖励：暂移除（地形爬坡不需要正常踏步步态），后续需要再加 ──
     feet_air_time = None
-
-    # ── 回调至 0803 平地基线权重（当前 walk_env_cfg 基类已调到 1.8 / -0.05）──
-    track_lin_vel_xy_exp = RewTerm(
-        func=mdp.track_lin_vel_xy_exp, weight=0.7, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
-    )
-    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.03)
 
 @configclass
 class RP_wd_Walk_Terrain_Env(RP_wd_Walk_Flat_Env):
