@@ -2,11 +2,11 @@
 
 任务描述：
     在 ``walk_env_platform_cfg``（高台/平台地形行走）基础上，参考 ``walk_env_stair_cfg``
-    的深度相机 pipeline，新增一台前视下倾的深度相机，把「带噪声 + 历史缓存的延迟多帧深度
+    的深度相机 pipeline，新增一台前视平视的深度相机，把「带噪声 + 历史缓存的延迟多帧深度
     序列」作为观测同时喂给 policy 与 critic，让策略学会「用深度相机看高台」攀爬。
 
 与 ``walk_env_platform_cfg`` 的区别：
-    - 场景：多一台 ``depth_camera``（NoisyGroupedRayCasterCamera，挂 base_link，前视下倾），
+    - 场景：多一台 ``depth_camera``（NoisyGroupedRayCasterCamera，挂 base_link，前视平视），
       与台阶任务一致：加噪声 pipeline + 37 帧历史缓存 + 自身连杆 raycast 目标。
     - 观测：policy 与 critic 的深度图改为 ``delayed_visualizable_image``（延迟多帧深度序列），
       观测组从「扁平向量」(concatenate_terms=True) 改为「分项 dict」(concatenate_terms=False)。
@@ -56,20 +56,19 @@ from .walk_env_platform_cfg import (
 class PlatformDepthSceneCfg(PlatformSceneCfg):
     """高台深度场景：继承平台场景，新增前视下倾的深度相机。"""
 
-    # 深度相机：挂 base_link，前视上仰（与台阶任务的下倾相反）。
+    # 深度相机：挂 base_link，前视平视（俯仰角 = 0，光轴与地面平行）。
     # 相机光轴为 +X（pinhole_camera_pattern 输出 x forward / y left / z up），
-    # 故用 convention="world"（forward=+X, up=+Z）。rot 绕 +Y 转 +角度=低头，转 -角度=仰头。
+    # 故用 convention="world"（forward=+X, up=+Z）。rot 用单位四元数即不做俯仰旋转。
     # 竖直 FOV = 2*atan((vertical_aperture/2)/focal_length)
-    #          = 2*atan((20.955*48/64/2)/24) ≈ 36.26°，半视场角 ≈ 18.13°。
-    # 高台地形箱体边缘高于机器人 base，需要仰视才能看到台面/台沿，
-    # 故令俯仰角 = -半视场角，使视场下边界（最靠近水平线的那条射线）正好与地面平行，
-    # 整个视场向上偏转，避免视场浪费在近处地面、优先看清前方高台。
+    #          = 2*atan((20.955*48/64/2)/24) ≈ 36.26°，半视场角 ≈ 18.13°，
+    # 平视时视场对称分布在水平线上下各 ~18.13°：下半幅看近处地面/台阶根部，
+    # 上半幅看高台台面/台沿，兼顾两者，不用像仰视/俯视那样偏向一侧。
     # 姿态为占位值，需在 viewer 里验证视角后再微调 pos/rot。
     depth_camera = NoisyGroupedRayCasterCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base_link",
         offset=NoisyGroupedRayCasterCameraCfg.OffsetCfg(
             pos=(0.29, 0.0, 0.07),
-            rot=(0.9875108, 0.0, -0.1575512, 0.0),  # 绕 +Y 转 -18.13°（仰头，= 半视场角）
+            rot=(1.0, 0.0, 0.0, 0.0),  # 单位四元数，不做俯仰旋转（平视）
             convention="world",
         ),
         data_types=["distance_to_image_plane"],
