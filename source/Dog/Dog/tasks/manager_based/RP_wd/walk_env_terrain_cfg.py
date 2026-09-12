@@ -75,11 +75,11 @@ class TerrainCommandsCfg:
         heading_command=True,
         heading_control_stiffness=0.5,
         debug_vis=True,
-        ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.3, 1.5), lin_vel_y=(-0.2, 0.5), ang_vel_z=(-1, 1), heading=(-math.pi, math.pi)
+           ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
+            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1, 1), heading=(-math.pi, math.pi)
         ),
         limit_ranges=mdp.UniformLevelVelocityCommandCfg.Ranges(
-            lin_vel_x=(-0.3, 1.5), lin_vel_y=(-0.2, 0.5), ang_vel_z=(-1, 1)
+            lin_vel_x=(-0.5, 0.8), lin_vel_y=(-0.4, 0.6), ang_vel_z=(-1, 1)
         ),
     )
 
@@ -98,8 +98,6 @@ class TerrainRewardsCfg(RewardsCfg):
     # ── 降权重：保留基础姿态约束，防止"前倾滑行"作弊 ──
     flat_orientation_l2 = None
 
-    joint_pos=None
-
     # 台阶上转向指令的追踪权重调低（避免为了转向牺牲爬升）
     track_ang_vel_z_exp = RewTerm(
         func=mdp.track_ang_vel_z_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
@@ -112,7 +110,7 @@ class TerrainRewardsCfg(RewardsCfg):
     # ABAD 单独加重惩罚，防止外展抬腿
     joint_pos_abad = RewTerm(
         func=mdp.joint_position_penalty,
-        weight=-0.4,
+        weight=-0.1,
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ABAD_JOINT"]),
             "stand_still_scale": 5.0,
