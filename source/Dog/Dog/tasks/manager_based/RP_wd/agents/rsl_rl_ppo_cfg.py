@@ -116,3 +116,13 @@ class PPORunnerPlatformDepthCfg(PPORunnerCfg):
     obs_groups = {"policy": ["policy"], "critic": ["critic"]}
     # 换成带深度图像编码器的 Actor-Critic（Dog 自带，不依赖 robolab rsl_rl fork）
     policy = RslRlPpoEncoderActorCriticCfg()
+
+
+@configclass
+class PPORunnerGapDepthCfg(PPORunnerPlatformDepthCfg):
+    """跨沟独立实验；复用支持深度历史帧的 CNN Actor-Critic。"""
+
+    experiment_name = "RP_wd_walk_gap_depth"
+    num_steps_per_env = 24
+    max_iterations = 5000
+    save_interval = 100
