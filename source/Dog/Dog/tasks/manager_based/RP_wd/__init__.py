@@ -7,21 +7,6 @@ import gymnasium as gym
 
 from . import agents
 
-# RP_wd 深度相机跨沟（训练与自动评估）
-for suffix, cfg_name in (
-    ("", "RP_wd_Walk_Gap_Depth_Env"),
-    ("_Play", "RP_wd_Walk_Gap_Depth_Env_Play"),
-):
-    gym.register(
-        id=f"RP_wd_Walk_Gap_Depth{suffix}",
-        entry_point="isaaclab.envs:ManagerBasedRLEnv",
-        disable_env_checker=True,
-        kwargs={
-            "env_cfg_entry_point": f"{__name__}.walk_env_gap_depth_cfg:{cfg_name}",
-            "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerGapDepthCfg",
-        },
-    )
-
 ##
 # Register Gym environments.
 ##
@@ -155,5 +140,27 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.walk_env_preceptive_platform_cfg:RP_wd_Walk_Platform_Depth_Env_Play",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerPlatformDepthCfg",
+    },
+)
+
+# RP_wd 深度相机跨沟（训练）
+gym.register(
+    id="RP_wd_Walk_Gap_Depth",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.walk_env_gap_depth_cfg:RP_wd_Walk_Gap_Depth_Env",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerGapDepthCfg",
+    },
+)
+
+# RP_wd 深度相机跨沟（Play）
+gym.register(
+    id="RP_wd_Walk_Gap_Depth_Play",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.walk_env_gap_depth_cfg:RP_wd_Walk_Gap_Depth_Env_Play",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerGapDepthCfg",
     },
 )
