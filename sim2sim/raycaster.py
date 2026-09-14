@@ -49,6 +49,15 @@ class DepthCamera:
             self._visualize(image)
         return image
 
+    def get_ray_geometry(self):
+        """返回 (cam_pos:(3,), hit_points:(nray,3))，世界坐标系，未命中为 NaN。
+
+        必须在 step() 之后调用（复用其 compute_distance() 结果，不重复触发射线计算）。
+        """
+        cam_pos = self._cam.get_cam_pos()
+        hits = self._cam.get_hit_points_world()
+        return cam_pos, hits
+
     def _visualize(self, image: np.ndarray) -> None:
         near, far = 0.1, 2.0
         clipped = np.clip(image, near, far)

@@ -138,6 +138,37 @@ def build_depth_obs(depth_history):
     return torch.from_numpy(stacked).unsqueeze(0).to(device)  # (1, 8, 48, 64)
 
 
+_RAY_VIS_RGBA = np.array([1.0, 0.0, 0.0, 1.0], dtype=np.float32)
+_IDENTITY_MAT = np.eye(3).flatten()
+
+
+def draw_ray_vis(viewer, depth_cam, stride):
+    """在 viewer.user_scn 里画深度相机射线(红线, 相机→命中点)和命中点(红点)。
+
+    每帧全量重建 user_scn 的 geom 列表(不重设会残留上一帧的线段)。
+    """
+    cam_pos, hits = depth_cam.get_ray_geometry()
+    hits = hits.reshape(depth_cam.v_ray_num, depth_cam.h_ray_num, 3)
+    sampled = hits[::stride, ::stride].reshape(-1, 3)
+    valid = ~np.isnan(sampled).any(axis=1)
+    pts = sampled[valid]
+
+    scn = viewer.user_scn
+    ngeom = 0
+    for p in pts:
+        if ngeom + 2 > scn.maxgeom:
+            break
+        mujoco.mjv_initGeom(scn.geoms[ngeom], mujoco.mjtGeom.mjGEOM_LINE,
+                            np.zeros(3), np.zeros(3), _IDENTITY_MAT, _RAY_VIS_RGBA)
+        mujoco.mjv_connector(scn.geoms[ngeom], mujoco.mjtGeom.mjGEOM_LINE,
+                             2.0, cam_pos, p)
+        ngeom += 1
+        mujoco.mjv_initGeom(scn.geoms[ngeom], mujoco.mjtGeom.mjGEOM_SPHERE,
+                            np.array([0.015, 0.0, 0.0]), p, _IDENTITY_MAT, _RAY_VIS_RGBA)
+        ngeom += 1
+    scn.ngeom = ngeom
+
+
 def main():
     parser = argparse.ArgumentParser(description="Isaac Lab→MuJoCo 台阶任务 sim2sim 部署")
     parser.add_argument("--ckpt", type=str,
@@ -150,6 +181,10 @@ def main():
     parser.add_argument("--vy", type=float, default=2.0, help="横移灵敏度")
     parser.add_argument("--wz", type=float, default=2.0, help="转向灵敏度")
     parser.add_argument("--debug-vis", action="store_true", help="打开深度相机 cv2 可视化窗口(标定用)")
+    parser.add_argument("--ray-vis", action="store_true",
+                        help="在 mujoco viewer 3D 场景里画深度相机射线(红线)和命中点(红点)")
+    parser.add_argument("--ray-vis-stride", type=int, default=2,
+                        help="--ray-vis 降采样步长: 每隔多少个像素画一根射线 (默认2)")
     parser.add_argument("--foxglove-host", type=str, default="0.0.0.0")
     parser.add_argument("--foxglove-port", type=int, default=8765)
     parser.add_argument("--no-foxglove", action="store_true")
@@ -220,6 +255,9 @@ def main():
             depth_frame = depth_cam.step()  # (48, 64), 米
             depth_history.append(depth_frame)
             depth_obs = build_depth_obs(depth_history)  # (1, 8, 48, 64)
+
+            if args.ray_vis:
+                draw_ray_vis(viewer, depth_cam, args.ray_vis_stride)
 
             obs = {"policy": {"obs_flat": scalar_obs, "depth_image": depth_obs}}
 

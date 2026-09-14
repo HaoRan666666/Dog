@@ -55,6 +55,28 @@ py::array_t<double> get_distance_to_image_plane_vec(RayCasterCamera &self,
   return py::array_t<double>(shape, data.data());
 }
 
+// 世界系命中点 (nray,3)，未命中为 NaN；用于 sim2sim 里在 mujoco viewer 的
+// user_scn 上画调试用的射线/命中点(纯数据，不涉及 mjvScene*，可以正常绑定)。
+py::array_t<double> get_hit_points_world(RayCasterCamera &self) {
+  std::vector<std::vector<double>> pts = self.get_data_pos_w();
+  py::ssize_t n = static_cast<py::ssize_t>(pts.size());
+  std::vector<py::ssize_t> shape{n, 3};
+  py::array_t<double> arr(shape);
+  auto buf = arr.mutable_unchecked<2>();
+  for (py::ssize_t i = 0; i < n; ++i) {
+    buf(i, 0) = pts[static_cast<size_t>(i)][0];
+    buf(i, 1) = pts[static_cast<size_t>(i)][1];
+    buf(i, 2) = pts[static_cast<size_t>(i)][2];
+  }
+  return arr;
+}
+
+// 相机世界系位置 (3,)，同一帧内所有射线共用同一个原点(非 stereo 场景)。
+py::array_t<double> get_cam_pos(RayCasterCamera &self) {
+  std::vector<py::ssize_t> shape{3};
+  return py::array_t<double>(shape, self.pos);
+}
+
 } // namespace
 
 PYBIND11_MODULE(raycaster_ext, m) {
@@ -87,6 +109,8 @@ PYBIND11_MODULE(raycaster_ext, m) {
       .def("enable_sensor", &RayCasterCamera::enable_sensor, py::arg("enable"))
       .def("get_distance_to_image_plane_vec", &get_distance_to_image_plane_vec,
            py::arg("is_noise") = false, py::arg("is_inf_max") = true)
+      .def("get_hit_points_world", &get_hit_points_world)
+      .def("get_cam_pos", &get_cam_pos)
       .def_readonly("h_ray_num", &RayCasterCamera::h_ray_num)
       .def_readonly("v_ray_num", &RayCasterCamera::v_ray_num)
       .def_readonly("nray", &RayCasterCamera::nray);
